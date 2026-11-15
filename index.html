@@ -52,6 +52,8 @@ h1{font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;ma
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
 .photo .ico{width:120px}
 .photo .ico svg{width:100%;height:auto;display:block}
+.ph-link{display:block;width:100%;height:100%;position:relative}
+.more{position:absolute;left:8px;top:8px;background:rgba(15,61,74,.8);color:#fffaf0;font-size:12px;font-weight:700;padding:3px 9px}
 .credit{position:absolute;right:0;bottom:0;background:rgba(15,61,74,.75);color:#fffaf0;font-size:10.5px;padding:1px 6px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .credit a{color:inherit}
 .thumbs{display:flex;gap:4px;padding:4px 4px 0}
@@ -421,7 +423,7 @@ async function google(){
     out.push({ id:'g' + g.id, n:name, lat:g.location.latitude, lon:g.location.longitude,
       c:catOf(g.primaryType, name), kind:(g.primaryTypeDisplayName && g.primaryTypeDisplayName.text) || '', cu:'', street:g.shortFormattedAddress || '',
       rating:g.rating, rc:g.userRatingCount, price:PRICE_KEY[g.priceLevel], open:g.currentOpeningHours ? g.currentOpeningHours.openNow : undefined, hrs,
-      photos:(g.photos || []).slice(0, 3).map(p => ({name:p.name, by:(p.authorAttributions || [])[0] || null})),
+      photos:(g.photos || []).slice(0, 1).map(p => ({name:p.name, by:(p.authorAttributions || [])[0] || null})),
       maps:g.googleMapsUri, web:g.websiteUri, veg:g.servesVegetarianFood, bfast:g.servesBreakfast,
       halal:/halal|nasi kandar|mamak/i.test(name) || /halal/.test(g.primaryType || '') ? true : undefined });
   });
@@ -514,14 +516,15 @@ function showPhoto(p, i){
   if (!ph || !KEY) { box.className = 'photo noimg'; box.innerHTML = icon(CATS[p.c].i); return; }
   box.className = 'photo';
   const by = ph.by ? `<span class="credit">照片：${ph.by.uri ? `<a href="${esc(ph.by.uri)}" target="_blank" rel="noopener">${esc(ph.by.displayName)}</a>` : esc(ph.by.displayName)}</span>` : '';
-  box.innerHTML = `<img src="${photoUrl(ph, 800)}" alt="${esc(p.n)} 的照片" loading="eager">` + by;
+  const link = p.maps || mapsSearch(p);
+  box.innerHTML = `<a class="ph-link" href="${esc(link)}" target="_blank" rel="noopener" aria-label="在 Google 地图看 ${esc(p.n)} 的更多照片"><img src="${photoUrl(ph, 800)}" alt="${esc(p.n)} 的照片" loading="eager"><span class="more">更多照片 ›</span></a>` + by;
   box.querySelector('img').onerror = () => { box.className = 'photo noimg'; box.innerHTML = icon(CATS[p.c].i); };
   [...$('thumbs').children].forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
 }
 function show(p){
   state.cur = p; $('gone').hidden = state.src === 'google';
   const photos = KEY && p.photos ? p.photos : [];
-  $('thumbs').innerHTML = photos.length > 1 ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 800)}" alt="" loading="lazy"></button>`).join('') : '';
+  $('thumbs').innerHTML = false ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 800)}" alt="" loading="lazy"></button>`).join('') : '';
   showPhoto(p, 0);
   $('r-name').textContent = p.n;
   $('r-dish').textContent = [p.kind, p.cu || p.street].filter(Boolean).join(' · ');
