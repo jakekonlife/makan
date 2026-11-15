@@ -73,6 +73,8 @@ h1{font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;ma
 .hours details summary::-webkit-details-marker{display:none}
 .hours ul{margin:4px 0 0;padding:0;list-style:none;font-variant-numeric:tabular-nums}
 .spinning h2{color:var(--accent)}
+.gone{align-self:flex-start;border:0;background:none;padding:2px 0 0;font-size:12.5px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.gone[hidden]{display:none}
 
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .actions > *{border:1.5px solid var(--ink);background:none;padding:10px 6px;text-align:center;text-decoration:none;font-weight:700;font-size:14px;display:block}
@@ -198,6 +200,7 @@ li.off{opacity:.4}
     <p class="dish" id="r-dish"></p>
     <div class="meta" id="r-meta"></div>
     <div class="hours" id="r-hours"></div>
+    <button type="button" class="gone" id="gone">这家倒了，以后别再抽</button>
   </div>
 </section>
 
@@ -219,6 +222,7 @@ li.off{opacity:.4}
   <summary>附近的店<span id="count"></span></summary>
   <div class="sortbar">排序 <div class="chips" id="f-sort"></div></div>
   <p class="hint">点店名直接选它，点距离打开导航。</p>
+  <p class="hint" id="closed-note"></p>
   <ol id="list"></ol>
 </details>
 <details class="fold last" id="keyfold">
@@ -299,6 +303,11 @@ let KEY = store.get('gkey') || '';
 const today = new Date().toDateString();
 const sk = store.get('near-skip'); if (sk && sk.day === today) sk.ids.forEach(i => state.skip.add(i));
 const saveSkip = () => store.set('near-skip', {day:today, ids:[...state.skip]});
+const closed = new Set(store.get('near-closed') || []);
+const saveClosed = () => store.set('near-closed', [...closed]);
+const ckey = p => p.n.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '') + '@' + p.lat.toFixed(3) + ',' + p.lon.toFixed(3);
+const isClosed = p => closed.has(ckey(p));
+let lastClosed = null;
 
 function dist(a, b){
   const R = 6371000, r = Math.PI/180, dLa = (b.lat-a.lat)*r, dLo = (b.lon-a.lon)*r;
@@ -393,7 +402,7 @@ function whereLine(){
 }
 
 /* ---------- data: Google Places (optional) ---------- */
-const GMASK = ['id','displayName','location','rating','userRatingCount','priceLevel','currentOpeningHours.openNow','currentOpeningHours.weekdayDescriptions','regularOpeningHours.weekdayDescriptions','photos','primaryType','primaryTypeDisplayName','googleMapsUri','websiteUri','shortFormattedAddress','servesVegetarianFood','servesBreakfast','takeout','delivery'].map(f => 'places.' + f).join(',');
+const GMASK = ['id','displayName','location','rating','userRatingCount','priceLevel','currentOpeningHours.openNow','currentOpeningHours.weekdayDescriptions','regularOpeningHours.weekdayDescriptions','photos','primaryType','primaryTypeDisplayName','googleMapsUri','websiteUri','businessStatus','shortFormattedAddress','servesVegetarianFood','servesBreakfast','takeout','delivery'].map(f => 'places.' + f).join(',');
 async function gNearby(types, rank){
   const {lat, lon} = state.pos;
   const r = await tfetch('https://places.googleapis.com/v1/places:searchNearby', {method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':KEY,'X-Goog-FieldMask':GMASK},
@@ -406,6 +415,7 @@ async function google(){
   const seen = new Set(), out = [];
   lists.flat().forEach(g => {
     if (!g || seen.has(g.id) || !g.location) return; seen.add(g.id);
+    if (g.businessStatus && g.businessStatus !== 'OPERATIONAL') return;
     const name = (g.displayName && g.displayName.text) || '';
     const hrs = (g.currentOpeningHours && g.currentOpeningHours.weekdayDescriptions) || (g.regularOpeningHours && g.regularOpeningHours.weekdayDescriptions) || null;
     out.push({ id:'g' + g.id, n:name, lat:g.location.latitude, lon:g.location.longitude,
@@ -496,7 +506,7 @@ function setPlaces(arr, note){
 }
 
 /* ---------- pick ---------- */
-const pool = () => state.places.filter(p => (!state.cat || p.c === state.cat) && [...state.conds].every(k => COND[k].f(p)) && !state.skip.has(p.id));
+const pool = () => state.places.filter(p => !isClosed(p) && (!state.cat || p.c === state.cat) && [...state.conds].every(k => COND[k].f(p)) && !state.skip.has(p.id));
 const mapsSearch = p => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([p.n, p.street, state.label].filter(Boolean).join(' '));
 function showPhoto(p, i){
   state.ph = i;
@@ -509,7 +519,7 @@ function showPhoto(p, i){
   [...$('thumbs').children].forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
 }
 function show(p){
-  state.cur = p;
+  state.cur = p; $('gone').hidden = state.src === 'google';
   const photos = KEY && p.photos ? p.photos : [];
   $('thumbs').innerHTML = photos.length > 1 ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 240)}" alt="" loading="lazy"></button>`).join('') : '';
   showPhoto(p, 0);
@@ -536,7 +546,7 @@ function empty(){
   const filtered = state.places.length > 0;
   $('r-name').textContent = filtered ? '没有符合条件的店' : (state.pos ? '附近没找到店' : '等你的位置');
   $('r-dish').textContent = filtered ? '少选一个条件、换个类型，或把范围调大。' : state.pos ? '把范围调大再试试。' : '允许定位，或在上面输入地点。';
-  $('r-meta').innerHTML = ''; $('r-hours').innerHTML = '';
+  $('r-meta').innerHTML = ''; $('r-hours').innerHTML = ''; $('gone').hidden = true;
   $('nav').removeAttribute('href'); $('menu').removeAttribute('href');
 }
 let timer = null;
@@ -555,8 +565,10 @@ function draw(instant){
 }
 function list(){
   const ok = new Set(pool().map(p => p.id));
-  $('count').textContent = state.places.length ? `${ok.size} / ${state.places.length} 家` : '';
-  let arr = state.places.slice();
+  const hid = state.places.filter(isClosed).length;
+  $('count').textContent = state.places.length ? `${ok.size} / ${state.places.length - hid} 家` : '';
+  $('closed-note').innerHTML = closed.size ? `你标记了 ${closed.size} 家倒闭的店，${hid ? `这附近有 ${hid} 家已隐藏。` : ''}<button type="button" id="closed-reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : '';
+  let arr = state.places.filter(p => !isClosed(p));
   if (state.sort === 'rating') arr.sort((a,b) => (b.rating || 0) - (a.rating || 0) || a.d - b.d);
   if (state.sort === 'random') arr.sort(() => Math.random() - .5);
   arr.sort((a,b) => ok.has(b.id) - ok.has(a.id));
@@ -567,7 +579,7 @@ function list(){
       <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" rel="noopener">${fmtD(p.d)}</a></li>`;
   }).join('');
   const n = state.skip.size;
-  $('status').innerHTML = (state.note ? esc(state.note) + ' ' : '') + (n ? `今天排除了 ${n} 家。<button type="button" id="reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : '');
+  $('status').innerHTML = (lastClosed ? `已把「${esc(lastClosed.n)}」标为倒闭，以后不会再抽到。<button type="button" id="undo-closed" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">撤销</button> ` : '') + (state.note ? esc(state.note) + ' ' : '') + (n ? `今天排除了 ${n} 家。<button type="button" id="reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : '');
   state.note = '';
 }
 function footer(){
@@ -578,13 +590,18 @@ function footer(){
 }
 
 /* ---------- events ---------- */
-$('go').addEventListener('click', () => draw(false));
+$('go').addEventListener('click', () => { lastClosed = null; draw(false); });
 $('nope').addEventListener('click', () => { if (state.cur) { state.skip.add(state.cur.id); saveSkip(); } draw(false); });
 $('relocate').addEventListener('click', () => locate(false));
 $('manual-go').addEventListener('click', manual);
 $('place').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); manual(); } });
 $('thumbs').addEventListener('click', e => { const b = e.target.closest('[data-ph]'); if (b && state.cur) showPhoto(state.cur, Number(b.dataset.ph)); });
-$('status').addEventListener('click', e => { if (e.target.id === 'reset') { state.skip.clear(); saveSkip(); draw(true); } });
+$('status').addEventListener('click', e => {
+  if (e.target.id === 'reset') { state.skip.clear(); saveSkip(); draw(true); }
+  if (e.target.id === 'undo-closed' && lastClosed) { closed.delete(ckey(lastClosed)); saveClosed(); const p = lastClosed; lastClosed = null; list(); show(p); chips('cond'); }
+});
+$('gone').addEventListener('click', () => { const p = state.cur; if (!p) return; closed.add(ckey(p)); saveClosed(); lastClosed = p; draw(false); });
+$('closed-note').addEventListener('click', e => { if (e.target.id === 'closed-reset') { closed.clear(); saveClosed(); lastClosed = null; draw(true); } });
 $('list').addEventListener('click', e => {
   const b = e.target.closest('.pickme'); if (!b) return;
   const p = state.places.find(x => x.id === b.closest('li').dataset.id);
