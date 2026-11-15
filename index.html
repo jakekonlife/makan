@@ -197,7 +197,7 @@ li.off{opacity:.4}
   </div>
 </details>
 
-<p class="foot">店家资料来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>，没有评分，小档口和新店可能没收录。你的位置只用来查附近的店和地名，不会存到别处。</p>
+<p class="foot">店家资料来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>（经 Photon 和 Overpass 查询），没有评分，小档口和新店可能没收录。你的位置只用来查附近的店和地名，不会存到别处。</p>
 </main>
 <script>
 const I = {
@@ -287,30 +287,73 @@ async function overpass(q){
   }
   throw last;
 }
+const KIND = {restaurant:'餐厅',cafe:'咖啡店',fast_food:'快餐',food_court:'美食中心'};
+async function photon(lat, lon, radius){
+  const km = Math.max(0.3, radius/1000);
+  const lists = await Promise.all(Object.keys(KIND).map(k =>
+    tfetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&radius=${km}&limit=50&osm_tag=amenity:${k}`, {}, 12000)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })));
+  const seen = new Set(), out = [];
+  lists.forEach(j => (j.features || []).forEach(f => {
+    const p = f.properties || {}, id = (p.osm_type || 'x').toLowerCase() + p.osm_id;
+    if (!p.name || seen.has(id)) return; seen.add(id);
+    const [lo, la] = f.geometry.coordinates;
+    out.push({id, n:p.name, lat:la, lon:lo, c:catOf({name:p.name, amenity:p.osm_value}), cu:'', h:'', halal:undefined, kind:KIND[p.osm_value],
+      street:[p.housenumber, p.street].filter(Boolean).join(' ')});
+  }));
+  return out.filter(p => dist(state.pos, p) <= radius * 1.05);
+}
+async function overpassPlaces(lat, lon, radius, ms){
+  const q = `[out:json][timeout:20];(nwr["amenity"~"^(restaurant|cafe|fast_food|food_court)$"]["name"](around:${radius},${lat},${lon}););out tags center 300;`;
+  const r = await tfetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}}, ms);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  return j.elements.map(e => {
+    const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, t = e.tags || {};
+    if (la == null) return null;
+    return { id:e.type[0]+e.id, n:t['name:zh'] && t['name:zh'] !== t.name ? `${t.name}（${t['name:zh']}）` : t.name, lat:la, lon:lo, c:catOf(t),
+      cu:(t.cuisine || '').replace(/_/g,' ').split(';').slice(0,3).join('、'), h:t.opening_hours || '', halal:t['diet:halal'], kind:KIND[t.amenity] };
+  }).filter(Boolean);
+}
+function setPlaces(arr, note){
+  state.places = arr.sort((a,b) => a.d - b.d);
+  store.set('near-cache', {pos:state.pos, radius:state.radius, places:state.places, label:state.label, at:Date.now()});
+  state.seen = []; state.note = note || ''; draw(true);
+}
 async function load(note){
   const my = ++state.req; state.busy = true;
   const {lat, lon} = state.pos;
   setWhere('正在找附近的店…', '');
   nameArea();
-  const q = `[out:json][timeout:20];(nwr["amenity"~"^(restaurant|cafe|fast_food|food_court)$"]["name"](around:${state.radius},${lat},${lon}););out tags center 300;`;
-  try {
-    const j = await overpass(q);
+  const shape = (o) => Object.assign(o, {d:dist(state.pos, {lat:o.lat, lon:o.lon})});
+  let got = null, errName = '';
+  try { got = await photon(lat, lon, state.radius); } catch (e) { errName = e && e.name; }
+  if (my !== state.req) return;
+  if (!got) {
+    try { got = await overpassPlaces(lat, lon, state.radius, 15000); } catch (e) { errName = e && e.name; }
     if (my !== state.req) return;
-    state.places = j.elements.map(e => {
-      const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, t = e.tags || {};
-      if (la == null) return null;
-      return { id:e.type[0]+e.id, n:t['name:zh'] && t['name:zh'] !== t.name ? `${t.name}（${t['name:zh']}）` : t.name, lat:la, lon:lo, c:catOf(t),
-        cu:(t.cuisine || '').replace(/_/g,' ').split(';').slice(0,3).join('、'), h:t.opening_hours || '', halal:t['diet:halal'], d:dist(state.pos, {lat:la, lon:lo}),
-        kind:{restaurant:'餐厅',cafe:'咖啡店',fast_food:'快餐',food_court:'美食中心'}[t.amenity] };
-    }).filter(Boolean).sort((a,b) => a.d - b.d);
-    store.set('near-cache', {pos:state.pos, radius:state.radius, places:state.places, label:state.label, at:Date.now()});
-    state.seen = []; state.note = note || ''; draw(true);
-  } catch (e) {
-    if (my !== state.req) return;
+  }
+  if (!got) {
     state.busy = false; state.places = []; draw(true);
-    setWhere('查不到附近的店', framed ? '预览窗口挡住了联网，请下载文件后用 Chrome 或 Safari 打开' : '地图服务暂时连不上（' + (e && e.name === 'AbortError' ? '超时' : '网络错误') + '），点「重新定位」再试');
+    setWhere('查不到附近的店', framed ? '预览窗口挡住了联网，请下载文件后用 Chrome 或 Safari 打开' : '地图服务暂时连不上（' + (errName === 'AbortError' ? '超时' : '网络错误') + '），点「重新定位」再试');
     return;
   }
+  setPlaces(got.map(shape), note);
+  state.busy = false; whereLine();
+  // Overpass has cuisine and opening hours; add them when it answers (it is unreachable on some networks).
+  overpassPlaces(lat, lon, state.radius, 9000).then(more => {
+    if (my !== state.req || !more.length) return;
+    const key = p => p.n.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
+    const byKey = new Map(state.places.map(p => [key(p), p]));
+    let added = 0;
+    more.forEach(m => { const k = key(m), old = byKey.get(k);
+      if (old) { if (!old.cu) old.cu = m.cu; if (!old.h) old.h = m.h; if (!old.halal) old.halal = m.halal; if (old.c === '其他') old.c = m.c; }
+      else { state.places.push(shape(m)); byKey.set(k, m); added++; } });
+    state.places.sort((a,b) => a.d - b.d);
+    store.set('near-cache', {pos:state.pos, radius:state.radius, places:state.places, label:state.label, at:Date.now()});
+    list(); if (state.cur) show(state.cur); whereLine();
+  }).catch(() => {});
+  return;
   state.busy = false; whereLine();
 }
 async function nameArea(){
@@ -319,7 +362,10 @@ async function nameArea(){
     const r = await tfetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=zh,en&lat=${state.pos.lat}&lon=${state.pos.lon}`);
     const a = (await r.json()).address || {};
     state.label = [a.neighbourhood || a.suburb || a.village || a.quarter || a.road, a.city || a.town || a.county].filter(Boolean).join(' · ');
-  } catch (e) { state.label = ''; }
+  } catch (e) {
+    try { const p = ((await (await tfetch(`https://photon.komoot.io/reverse?lat=${state.pos.lat}&lon=${state.pos.lon}`, {}, 8000)).json()).features || [])[0]?.properties || {};
+      state.label = [p.district || p.locality, p.city].filter(Boolean).join(' · '); } catch (e2) { state.label = ''; }
+  }
   whereLine();
 }
 function whereLine(){
@@ -333,7 +379,7 @@ function show(p){
   state.cur = p; const C = CATS[p.c];
   $('tile').innerHTML = icon(C.i);
   $('r-name').textContent = p.n;
-  $('r-dish').textContent = [p.kind, p.cu].filter(Boolean).join(' · ');
+  $('r-dish').textContent = [p.kind, p.cu || p.street].filter(Boolean).join(' · ');
   $('r-meta').innerHTML = `<span class="tag">${fmtD(p.d)}</span><span class="tag line">走路约 ${Math.max(1, Math.round(p.d/75))} 分钟</span><span class="tag line">${esc(p.c)}</span>` +
     (p.halal === 'yes' || p.halal === 'only' ? '<span class="tag ok">清真</span>' : p.halal === 'no' ? '<span class="tag warn">非清真</span>' : '');
   $('r-hours').textContent = p.h ? '营业：' + p.h : '地图资料里没有营业时间';
