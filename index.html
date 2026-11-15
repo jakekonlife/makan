@@ -421,7 +421,7 @@ async function google(){
     out.push({ id:'g' + g.id, n:name, lat:g.location.latitude, lon:g.location.longitude,
       c:catOf(g.primaryType, name), kind:(g.primaryTypeDisplayName && g.primaryTypeDisplayName.text) || '', cu:'', street:g.shortFormattedAddress || '',
       rating:g.rating, rc:g.userRatingCount, price:PRICE_KEY[g.priceLevel], open:g.currentOpeningHours ? g.currentOpeningHours.openNow : undefined, hrs,
-      photos:(g.photos || []).slice(0, 4).map(p => ({name:p.name, by:(p.authorAttributions || [])[0] || null})),
+      photos:(g.photos || []).slice(0, 3).map(p => ({name:p.name, by:(p.authorAttributions || [])[0] || null})),
       maps:g.googleMapsUri, web:g.websiteUri, veg:g.servesVegetarianFood, bfast:g.servesBreakfast,
       halal:/halal|nasi kandar|mamak/i.test(name) || /halal/.test(g.primaryType || '') ? true : undefined });
   });
@@ -521,7 +521,7 @@ function showPhoto(p, i){
 function show(p){
   state.cur = p; $('gone').hidden = state.src === 'google';
   const photos = KEY && p.photos ? p.photos : [];
-  $('thumbs').innerHTML = photos.length > 1 ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 240)}" alt="" loading="lazy"></button>`).join('') : '';
+  $('thumbs').innerHTML = photos.length > 1 ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 800)}" alt="" loading="lazy"></button>`).join('') : '';
   showPhoto(p, 0);
   $('r-name').textContent = p.n;
   $('r-dish').textContent = [p.kind, p.cu || p.street].filter(Boolean).join(' · ');
