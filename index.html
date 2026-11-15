@@ -495,7 +495,7 @@ const GMASK = ['id','displayName','location','rating','userRatingCount','priceLe
 async function google(q){
   const {lat, lon} = state.pos;
   const r = await tfetch('https://places.googleapis.com/v1/places:searchText', {method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':KEY,'X-Goog-FieldMask':GMASK},
-    body:JSON.stringify({textQuery:q, pageSize:20, languageCode:'zh-CN', regionCode:'MY', locationBias:{circle:{center:{latitude:lat, longitude:lon}, radius:Math.max(state.radius, 1000)}}})}, 15000);
+    body:JSON.stringify({textQuery:q, pageSize:20, languageCode:'zh-CN', regionCode:'MY', rankPreference:'DISTANCE', locationBias:{circle:{center:{latitude:lat, longitude:lon}, radius:Math.max(state.radius, 1000)}}})}, 15000);
   if (!r.ok) { const j = await r.json().catch(() => ({})); const e = new Error((j.error && j.error.message) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
   return ((await r.json()).places || []).filter(g => g.location && (!g.businessStatus || g.businessStatus === 'OPERATIONAL')).map(g => {
     const name = (g.displayName && g.displayName.text) || '';
@@ -525,7 +525,14 @@ async function load(note){
   if (hit && Date.now() - hit.at < 6*3600*1000) { state.busy = false; state.src = hit.src; setPlaces(hit.places, note); return; }
   setStatus(''); $('r-name').textContent = `正在找附近的「${state.dish.n}」…`; $('result').classList.add('idle');
   let got = null, src = '', gErr = '';
-  if (KEY) { try { got = await google(state.dish.q); src = 'google'; } catch (e) { gErr = e.status === 429 ? '今天的查询次数用完了' : e.status === 403 || e.status === 400 ? '密钥无效或服务没开启' : (e.name === 'AbortError' ? '连接超时' : e.message); } }
+  if (KEY) { try {
+      got = await google(state.dish.n); src = 'google';
+      const near = got.filter(o => dist(state.pos, o) <= state.radius * 1.25).length;
+      if (near < 3 && state.dish.q && state.dish.q !== state.dish.n && my === state.req) {
+        const more = await google(state.dish.q), ids = new Set(got.map(o => o.id));
+        more.forEach(o => { if (!ids.has(o.id)) got.push(o); });
+      }
+    } catch (e) { gErr = e.status === 429 ? '今天的查询次数用完了' : e.status === 403 || e.status === 400 ? '密钥无效或服务没开启' : (e.name === 'AbortError' ? '连接超时' : e.message); } }
   if (my !== state.req) return;
   if (!got) { try { got = await photonSearch(state.dish.q); src = 'osm'; } catch (e) {} }
   if (my !== state.req) return;
