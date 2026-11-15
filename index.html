@@ -70,6 +70,7 @@ h1{font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;ma
 .tag.dark{background:var(--ink);border-color:var(--ink);color:var(--card)}
 .tag.on{border-color:#2f7d4f;color:#2f7d4f}
 .tag.off{border-color:var(--accent);color:var(--accent)}
+.tag.occ{background:var(--sand);border-color:var(--sand)}
 .hours{font-size:12.5px;margin:0;color:var(--muted)}
 .hours details summary{cursor:pointer;list-style:none;text-decoration:underline;text-underline-offset:3px}
 .hours details summary::-webkit-details-marker{display:none}
@@ -129,6 +130,27 @@ li.off{opacity:.4}
 .foot{font-size:11.5px;color:var(--muted);margin:0}
 @media (max-width:380px){h1{font-size:34px}.pick h2{font-size:24px}.actions > *{font-size:13px}}
 @media (prefers-reduced-motion:no-preference){.photo .ico svg{transition:transform .25s}.spinning .photo .ico svg{transform:rotate(-8deg) scale(.94)}}
+
+/* wheel version additions */
+.step{display:flex;flex-direction:column;gap:10px}
+.step-h{display:flex;align-items:baseline;gap:8px;margin:0;font-size:13px;color:var(--muted);font-weight:500}
+.step-h b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--ink);letter-spacing:1px}
+.wheel-wrap{position:relative;width:min(100%,320px);aspect-ratio:1/1;margin:4px auto 0}
+.wheel-wrap canvas{width:100%;height:100%;display:block}
+.pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:24px solid var(--accent);filter:drop-shadow(0 2px 0 rgba(15,61,74,.25));z-index:2}
+.hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:68px;height:68px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-family:var(--display);font-size:24px;letter-spacing:2px;box-shadow:0 0 0 5px var(--card),0 0 0 6.5px var(--ink);z-index:2}
+.hub:disabled{opacity:.85}
+.verdict{text-align:center;margin:0;min-height:1.6em;font-size:14px;color:var(--muted)}
+.verdict b{font-family:var(--display);font-weight:400;font-size:30px;color:var(--ink);letter-spacing:2px;display:block;line-height:1.2}
+.result.idle .pick h2{font-size:22px;color:var(--muted)}
+.step + .step .actions, .actions{grid-template-columns:1fr 1fr}
+.edit-list{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.edit-list span{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);background:var(--card);font-size:13px;padding:2px 2px 2px 10px}
+.edit-list button{border:0;background:none;padding:0 6px;font-size:15px;line-height:1;color:var(--muted)}
+.edit-add{display:flex;gap:6px;padding:0 0 8px}
+.edit-add input{flex:1;min-width:0;border:1px solid var(--line);padding:8px 10px;font:inherit;background:var(--card);color:var(--ink)}
+.edit-add button,.edit-reset{border:1.5px solid var(--ink);background:none;font-weight:700;padding:6px 12px}
+.edit-reset{margin:0 0 14px;font-weight:500;font-size:13px}
 </style>
 </head>
 <body>
@@ -206,45 +228,61 @@ li.off{opacity:.4}
   <h1>今天吃什么</h1>
   <div class="search">
     <input id="place" type="search" enterkeyhint="search" placeholder="输入地点，例如 Sri Petaling" aria-label="输入地点">
-    <button type="button" id="manual-go">找附近</button>
+    <button type="button" id="manual-go">用这里</button>
     <button type="button" class="gps" id="relocate" aria-label="用我现在的位置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>定位</button>
   </div>
   <p class="loc"><b id="where">正在定位…</b><span id="where2">请在浏览器弹窗里允许使用位置</span></p>
 </header>
 
-<section class="result" id="result" aria-live="polite">
-  <div class="photo noimg" id="photo"></div>
-  <div class="thumbs" id="thumbs"></div>
-  <div class="pick">
-    <div class="eyebrow">这一餐去</div>
-    <h2 id="r-name">—</h2>
-    <p class="dish" id="r-dish"></p>
-    <div class="meta" id="r-meta"></div>
-    <div class="hours" id="r-hours"></div>
-    <button type="button" class="gone" id="gone">这家倒了，以后别再抽</button>
+<section class="step" aria-labelledby="s1">
+  <p class="step-h" id="s1"><b>① 吃什么</b>选场合，转一下</p>
+  <div class="chips" id="f-occ"></div>
+  <div class="wheel-wrap">
+    <div class="pointer" aria-hidden="true"></div>
+    <canvas id="wheel" width="640" height="640" role="img" aria-label="食物轮盘"></canvas>
+    <button type="button" class="hub" id="spin">转</button>
   </div>
+  <p class="verdict" id="verdict" aria-live="polite">点中间的「转」，看今天吃什么</p>
 </section>
 
-<div class="actions">
-  <button class="go" id="go" type="button">再抽一家</button>
-  <button class="nope" id="nope" type="button">不想吃这家</button>
-  <a id="menu" target="_blank" rel="noopener">菜单·照片</a>
-  <a id="nav" target="_blank" rel="noopener">带我去</a>
-</div>
-<p class="status" id="status"></p>
-
-<section class="filters" aria-label="筛选">
-  <div class="row"><span>范围</span><div class="chips" id="f-radius"></div></div>
-  <div class="row"><span>想吃</span><div class="chips" id="f-cat"></div></div>
-  <div class="row"><span>条件</span><div class="chips" id="f-cond"></div></div>
+<section class="step" aria-labelledby="s2">
+  <p class="step-h" id="s2"><b>② 去哪吃</b><span id="s2-sub">转到之后，这里会推荐附近的店</span></p>
+  <section class="result idle" id="result" aria-live="polite">
+    <div class="photo noimg" id="photo"></div>
+    <div class="pick">
+      <div class="eyebrow" id="eyebrow">推荐这家</div>
+      <h2 id="r-name">先转轮盘</h2>
+      <p class="dish" id="r-dish"></p>
+      <div class="meta" id="r-meta"></div>
+      <div class="hours" id="r-hours"></div>
+    </div>
+  </section>
+  <div class="actions">
+    <button class="go" id="next" type="button">换一家</button>
+    <a id="menu" target="_blank" rel="noopener">菜单·照片</a>
+    <a id="nav" target="_blank" rel="noopener">带我去</a>
+  </div>
+  <p class="status" id="status"></p>
+  <section class="filters" aria-label="筛选">
+    <div class="row"><span>范围</span><div class="chips" id="f-radius"></div></div>
+    <div class="row"><span>条件</span><div class="chips" id="f-cond"></div></div>
+  </section>
 </section>
 
-<details class="fold first">
-  <summary>附近的店<span id="count"></span></summary>
+<details class="fold first" id="listfold">
+  <summary><span id="list-title">附近的店</span><span id="count"></span></summary>
   <div class="sortbar">排序 <div class="chips" id="f-sort"></div></div>
   <p class="hint">点店名直接选它，点距离打开导航。</p>
-  <p class="hint" id="closed-note"></p>
   <ol id="list"></ol>
+</details>
+<details class="fold" id="editfold">
+  <summary>编辑轮盘<span id="edit-occ"></span></summary>
+  <div class="edit-list" id="edit-list"></div>
+  <div class="edit-add">
+    <input id="edit-in" type="text" placeholder="加一样食物，例如 酿豆腐" aria-label="加一样食物">
+    <button type="button" id="edit-addbtn">加入</button>
+  </div>
+  <button type="button" class="edit-reset" id="edit-reset">恢复这个场合的默认选项</button>
 </details>
 <details class="fold last" id="keyfold">
   <summary>这台设备<span id="keystate">已解锁</span></summary>
@@ -267,58 +305,31 @@ const I = {
 '咖啡':'<rect x="36" y="48" width="56" height="50" fill="#fffaf0"/><rect x="36" y="48" width="56" height="12" fill="#e8553a"/><path d="M92 58h10a12 12 0 0 1 0 24h-10" fill="none" stroke="#fffaf0" stroke-width="7"/><rect x="26" y="100" width="76" height="7" fill="#7fb3b5"/><path d="M54 38q4-10 0-18M72 38q4-10 0-18" fill="none" stroke="#f0dfb8" stroke-width="3" stroke-linecap="round"/>'
 };
 const icon = c => '<div class="ico"><svg viewBox="0 0 140 120" aria-hidden="true">' + I[c] + '</svg></div>';
-const CATS = {
-  '中餐':{i:'点心', re:/chinese|dim_sum|dumpling|hot_?pot|cantonese|hainan|teochew|hakka|porridge|bak_kut_teh|taiwan/},
-  '马来':{i:'饭', re:/malay|indonesian|nasi|satay|padang|nyonya|peranakan/},
-  '印度·嘛嘛':{i:'粥煲', re:/indian|mamak|curry|pakistani|middle_eastern|arab|kebab|turkish|lebanese/},
-  '日韩泰':{i:'面', re:/japanese|sushi|ramen|korean|thai|vietnamese|pho/},
-  '海鲜':{i:'大炒', re:/seafood|fish/},
-  '西餐·快餐':{i:'大炒', re:/burger|hamburger|pizza|western|italian|steak|american|chicken|sandwich|fried|pasta|mexican|fast_food|french|spanish|greek|brunch/},
-  '咖啡·甜点':{i:'咖啡', re:/coffee|cafe|bubble_tea|tea_house|dessert|cake|ice_cream|bakery|juice|confectionery|donut|bagel/},
-  '其他':{i:'饭', re:/$^/}
-};
-const ORDER = ['日韩泰','印度·嘛嘛','海鲜','中餐','马来','西餐·快餐','咖啡·甜点'];
-function catOf(code, name){
-  const c = (code || '').toLowerCase(), n = name || '';
-  for (const k of ORDER) if (CATS[k].re.test(c)) return k;
-  if (/seafood|ikan|海鲜|steam ?fish|蒸鱼/i.test(n)) return '海鲜';
-  if (/mamak|nasi kandar|maju|naan|roti|banana leaf/i.test(n)) return '印度·嘛嘛';
-  if (/[一-鿿]/.test(n) || /kopitiam|kedai kopi|kedai makanan|dim sum|bak kut|wantan|wan tan|pan mee|chicken rice/i.test(n)) return '中餐';
-  if (/warung|nasi|ayam|selera|masakan|kampung|tomyam|tom yam/i.test(n)) return '马来';
-  if (/mcdonald|kfc|burger|pizza|subway|texas|marrybrown|domino|a&w|4fingers/i.test(n)) return '西餐·快餐';
-  if (/coffee|cafe|café|kopi|tea|zus|starbucks|tealive|chagee|bakery|dessert/i.test(n)) return '咖啡·甜点';
-  return '其他';
-}
-const KIND = {restaurant:'餐厅', cafe:'咖啡店', fast_food:'快餐', food_court:'美食中心'};
-const PRICE = ['免费', '平价', '中等', '偏贵', '很贵'];
-const PRICE_KEY = {PRICE_LEVEL_FREE:0, PRICE_LEVEL_INEXPENSIVE:1, PRICE_LEVEL_MODERATE:2, PRICE_LEVEL_EXPENSIVE:3, PRICE_LEVEL_VERY_EXPENSIVE:4};
-
-const COND = {
-  open:  {l:'营业中',   f:p => p.open === true,           has:p => p.open !== undefined},
-  r4:    {l:'4 分以上', f:p => p.rating >= 4,             has:p => p.rating != null},
-  cheap: {l:'平价',     f:p => p.price != null && p.price <= 1, has:p => p.price != null},
-  halal: {l:'清真',     f:p => p.halal === true,          has:p => p.halal === true},
-  veg:   {l:'素食',     f:p => p.veg === true,            has:p => p.veg === true},
-  bfast: {l:'有早餐',   f:p => p.bfast === true,          has:p => p.bfast === true},
-  photo: {l:'有照片',   f:p => p.photos && p.photos.length > 0, has:p => p.photos && p.photos.length > 0},
-  near:  {l:'走路 5 分钟内', f:p => p.d <= 400,           has:p => p.d <= 400}
-};
-
-let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const store = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }, del(k){ try { localStorage.removeItem(k); } catch (e) {} } };
+let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const state = { req:0, lid:0, pos:null, label:'', radius:1000, cat:'', conds:new Set(), sort:'near', places:[], src:'', skip:new Set(), seen:[], cur:null, busy:false, ph:0, note:'' };
+/* ---------- wheel content ---------- */
+const OCC = {bf:'早午餐', dn:'晚餐', grp:'聚餐', tea:'喝茶'};
+// [显示名, Google 搜索词, 图标]
+const DEFAULTS = {
+  bf: [['椰浆饭','nasi lemak','饭'],['点心','dim sum','点心'],['板面','pan mee','面'],['云吞面','wantan mee','面'],['印度煎饼','roti canai','大炒'],['咖椰吐司','kopitiam kaya toast','咖啡'],['猪肉粉','pork noodle','面'],['粥','porridge','粥煲'],['炒粿条','char kuey teow','大炒'],['咖喱面','curry mee','面'],['鸡饭','chicken rice','饭'],['西式早午餐','brunch cafe','咖啡']],
+  dn: [['大炒','tai chow restaurant','大炒'],['火锅','steamboat hot pot','粥煲'],['日本料理','japanese restaurant','面'],['韩国烤肉','korean bbq','大炒'],['肉骨茶','bak kut teh','粥煲'],['海鲜','seafood restaurant','大炒'],['西餐','western food','大炒'],['泰国菜','thai food','饭'],['拉面','ramen','面'],['瓦煲','claypot','粥煲'],['嘛嘛档','mamak','饭'],['烧烤','bbq grill','大炒']],
+  grp: [['火锅','steamboat hot pot','粥煲'],['海鲜','seafood restaurant','大炒'],['自助餐','buffet restaurant','饭'],['韩国烤肉','korean bbq','大炒'],['大炒','tai chow restaurant','大炒'],['中餐酒家','chinese restaurant','点心'],['日本料理','japanese restaurant','面'],['牛排西餐','steak house','大炒'],['泰国菜','thai restaurant','饭'],['烤鱼','grilled fish restaurant','大炒']],
+  tea: [['奶茶','bubble tea','咖啡'],['咖啡','coffee','咖啡'],['甜品','dessert','咖啡'],['糖水','tong sui dessert','粥煲'],['蛋糕','cake shop','咖啡'],['冰淇淋','ice cream','咖啡'],['华夫饼','waffle','咖啡'],['茶室','kopitiam','咖啡'],['煎蕊','cendol','粥煲'],['手冲咖啡','specialty coffee','咖啡']]
+};
+const itemsKey = occ => 'wheel-' + occ;
+const getItems = occ => store.get(itemsKey(occ)) || DEFAULTS[occ].map(([n, q, i]) => ({n, q, i}));
+const setItems = (occ, list) => store.set(itemsKey(occ), list);
+
+/* ---------- state ---------- */
+const hr0 = new Date().getHours();
+const state = { req:0, lid:0, pos:null, label:'', radius:1000,
+  occ: hr0 >= 14 && hr0 < 17 ? 'tea' : hr0 >= 17 || hr0 < 4 ? 'dn' : 'bf',
+  dish:null, places:[], src:'', conds:new Set(), sort:'near', seen:[], cur:null, busy:false };
 let KEY = store.get('gkey') || '';
-const today = new Date().toDateString();
-const sk = store.get('near-skip'); if (sk && sk.day === today) sk.ids.forEach(i => state.skip.add(i));
-const saveSkip = () => store.set('near-skip', {day:today, ids:[...state.skip]});
-const closed = new Set(store.get('near-closed') || []);
-const saveClosed = () => store.set('near-closed', [...closed]);
-const ckey = p => p.n.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '') + '@' + p.lat.toFixed(3) + ',' + p.lon.toFixed(3);
-const isClosed = p => closed.has(ckey(p));
-let lastClosed = null;
 
 function dist(a, b){
   const R = 6371000, r = Math.PI/180, dLa = (b.lat-a.lat)*r, dLo = (b.lon-a.lon)*r;
@@ -331,11 +342,74 @@ function tfetch(url, opt, ms){
   return fetch(url, Object.assign({signal:c.signal}, opt || {})).finally(() => clearTimeout(t));
 }
 
+/* ---------- wheel drawing ---------- */
+const cv = $('wheel'), ctx = cv.getContext('2d');
+let rot = 0, spinning = false;
+function drawWheel(){
+  const items = getItems(state.occ), n = Math.max(items.length, 1), W = cv.width, R = W/2 - 8, c = W/2, seg = 2*Math.PI/n;
+  ctx.clearRect(0, 0, W, W);
+  ctx.save(); ctx.translate(c, c);
+  ctx.beginPath(); ctx.arc(0, 0, R + 6, 0, 2*Math.PI); ctx.fillStyle = '#0f3d4a'; ctx.fill();
+  for (let i = 0; i < n; i++){
+    const a0 = rot + i*seg, a1 = a0 + seg;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a0, a1); ctx.closePath();
+    ctx.fillStyle = n % 2 && i === n - 1 && n > 1 ? '#7fb3b5' : (i % 2 ? '#fffaf0' : '#f0dfb8');
+    if (state.dishIdx === i && !spinning && state.dish) ctx.fillStyle = '#e8553a';
+    ctx.fill(); ctx.strokeStyle = 'rgba(15,61,74,.35)'; ctx.lineWidth = 2; ctx.stroke();
+    if (!items[i]) continue;
+    const mid = a0 + seg/2, flip = Math.cos(mid) < 0;
+    ctx.save(); ctx.rotate(flip ? mid + Math.PI : mid);
+    const fs = Math.max(20, Math.min(34, 300 / Math.max(n, 6)));
+    ctx.font = `700 ${fs}px "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif`;
+    ctx.fillStyle = state.dishIdx === i && !spinning && state.dish ? '#ffffff' : '#0f3d4a';
+    ctx.textAlign = flip ? 'left' : 'right'; ctx.textBaseline = 'middle';
+    let label = items[i].n; while (ctx.measureText(label).width > R - 90 && label.length > 1) label = label.slice(0, -1);
+    if (label !== items[i].n) label = label.slice(0, -1) + '…';
+    ctx.fillText(label, flip ? -(R - 18) : R - 18, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function spin(){
+  const items = getItems(state.occ);
+  if (spinning || !items.length) return;
+  const idx = Math.floor(Math.random()*items.length), seg = 2*Math.PI/items.length;
+  // put slice idx under the pointer (top = -PI/2), with a little random offset inside the slice
+  const jitter = (Math.random() - .5) * seg * .6;
+  let target = -Math.PI/2 - (idx + .5)*seg + jitter;
+  const turns = reduceMotion() ? 0 : 6;
+  while (target < rot + turns*2*Math.PI) target += 2*Math.PI;
+  const start = rot, dur = reduceMotion() ? 0 : 3600, t0 = performance.now();
+  spinning = true; $('spin').disabled = true; state.dish = null; drawWheel();
+  $('verdict').innerHTML = '转呀转…';
+  const step = now => {
+    const t = dur ? Math.min(1, (now - t0)/dur) : 1, e = 1 - Math.pow(1 - t, 4);
+    rot = start + (target - start)*e; drawWheel();
+    if (t < 1) requestAnimationFrame(step);
+    else { rot = target % (2*Math.PI); spinning = false; $('spin').disabled = false; chooseDish(idx); }
+  };
+  requestAnimationFrame(step);
+}
+function chooseDish(idx){
+  const it = getItems(state.occ)[idx]; if (!it) return;
+  state.dish = it; state.dishIdx = idx; drawWheel();
+  $('verdict').innerHTML = `今天吃<b>${esc(it.n)}</b>`;
+  $('s2-sub').textContent = `附近卖「${it.n}」的店`;
+  $('list-title').textContent = `附近卖「${it.n}」的店`;
+  if (state.pos) load(); else setStatus('先定位或在上面输入地点，才能找附近的店。');
+}
+
 /* ---------- chips ---------- */
+const COND = {
+  open:  {l:'营业中',       f:p => p.open === true,  has:p => p.open !== undefined},
+  r4:    {l:'4 分以上',     f:p => p.rating >= 4,    has:p => p.rating != null},
+  cheap: {l:'平价',         f:p => p.price != null && p.price <= 1, has:p => p.price != null},
+  near:  {l:'走路 5 分钟内', f:p => p.d <= 400,       has:p => p.d <= 400}
+};
 const F = {
+  occ: Object.entries(OCC),
   radius:[[500,'500 米'],[1000,'1 公里'],[2000,'2 公里'],[5000,'5 公里']],
-  cat:[['','随便']].concat(Object.keys(CATS).map(k => [k,k])),
-  sort:[['near','最近'],['rating','评分高'],['random','随机']]
+  sort:[['near','最近'],['rating','评分高']]
 };
 function chips(key){
   if (key === 'cond') {
@@ -345,34 +419,37 @@ function chips(key){
     $('f-cond').innerHTML = avail.map(k => `<button type="button" class="chip" data-k="cond" data-v="${k}" aria-pressed="${state.conds.has(k)}">${COND[k].l}</button>`).join('');
     return;
   }
-  let opts = F[key];
-  if (key === 'sort' && !state.places.some(p => p.rating != null)) opts = opts.filter(o => o[0] !== 'rating');
-  $('f-'+key).innerHTML = opts.map(([v,l]) => `<button type="button" class="chip" data-k="${key}" data-v="${v}" aria-pressed="${String(state[key])===String(v)}">${l}</button>`).join('');
+  $('f-'+key).innerHTML = F[key].map(([v,l]) => `<button type="button" class="chip" data-k="${key}" data-v="${v}" aria-pressed="${String(state[key])===String(v)}">${l}</button>`).join('');
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
   const k = b.dataset.k, v = b.dataset.v;
-  if (k === 'radius') { state.radius = Number(v); chips('radius'); if (state.pos) load(); return; }
-  if (k === 'cat') { state.cat = v; chips('cat'); }
-  if (k === 'cond') { state.conds.has(v) ? state.conds.delete(v) : state.conds.add(v); chips('cond'); }
-  if (k === 'sort') { state.sort = v; chips('sort'); list(); return; }
-  state.seen = []; draw(true);
+  if (k === 'occ') {
+    if (spinning) return;
+    state.occ = v; state.dish = null; state.dishIdx = -1; chips('occ'); drawWheel(); renderEdit();
+    $('verdict').textContent = '点中间的「转」，看今天吃什么'; resetResult(); return;
+  }
+  if (k === 'radius') { state.radius = Number(v); chips('radius'); if (state.pos && state.dish) load(); return; }
+  if (k === 'cond') { state.conds.has(v) ? state.conds.delete(v) : state.conds.add(v); chips('cond'); state.seen = []; pick(); return; }
+  if (k === 'sort') { state.sort = v; chips('sort'); list(); }
 });
 
 /* ---------- location ---------- */
 function setWhere(a, b){ $('where').textContent = a; $('where2').textContent = b || ''; }
+function setStatus(t){ $('status').textContent = t || ''; }
 function locate(auto){
   if (!navigator.geolocation) { setWhere('这个浏览器不支持定位', '在上面输入地点也可以'); return; }
   if (!auto) setWhere('正在定位…', '如果浏览器弹出询问，请点允许');
   const lid = ++state.lid; let done = false;
-  if (!auto) setTimeout(() => { if (!done && lid === state.lid) { done = true; setWhere('定位没有回应', framed ? '预览窗口不允许定位，请在浏览器里打开' : '浏览器没有给出位置，在上面输入地点也可以'); $('place').focus(); } }, 15000);
+  if (!auto) setTimeout(() => { if (!done && lid === state.lid) { done = true; setWhere('定位没有回应', framed ? '预览窗口不允许定位，请在浏览器里打开' : '浏览器没有给出位置，在上面输入地点也可以'); } }, 15000);
   navigator.geolocation.getCurrentPosition(p => {
     if (done || lid !== state.lid) return; done = true;
     const np = {lat:p.coords.latitude, lon:p.coords.longitude, acc:p.coords.accuracy};
     if (auto && state.pos && dist(state.pos, np) < 250) return;
     const moved = auto && state.pos;
     state.pos = np; state.label = ''; $('place').value = '';
-    load(moved ? '你换地方了，已按新位置更新。' : '');
+    nameArea();
+    if (state.dish) load(moved ? '你换地方了，已按新位置重新找。' : '');
   }, err => {
     if (auto || done || lid !== state.lid) return; done = true;
     setWhere(err.code === 1 ? '没有拿到定位权限' : '定位失败', framed ? '预览窗口不允许定位，请在浏览器里打开' : err.code === 1 ? '在浏览器的网站设置里允许位置，或在上面输入地点' : '检查设备的定位服务是否打开，或在上面输入地点');
@@ -392,7 +469,8 @@ async function manual(){
     if (j.length) hit = {lat:+j[0].lat, lon:+j[0].lon};
   } catch (e) {}
   if (!hit) { setWhere('找不到这个地点', '换个写法，或加上城市名再试'); return; }
-  state.pos = hit; state.label = q; load();
+  state.pos = hit; state.label = q; whereLine();
+  if (state.dish) load();
 }
 async function nameArea(){
   if (state.label) return whereLine();
@@ -400,237 +478,185 @@ async function nameArea(){
   try {
     const p = ((await (await tfetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`, {}, 8000)).json()).features || [])[0]?.properties || {};
     state.label = [p.district || p.locality || p.street, p.city].filter(Boolean).join(' · ');
-  } catch (e) {
-    try { const a = (await (await tfetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=zh,en&lat=${lat}&lon=${lon}`, {}, 8000)).json()).address || {};
-      state.label = [a.neighbourhood || a.suburb || a.village || a.road, a.city || a.town].filter(Boolean).join(' · '); } catch (e2) {}
-  }
+  } catch (e) {}
   whereLine();
 }
 function whereLine(){
-  if (!state.pos || state.busy) return;
-  const acc = state.pos.acc ? `，定位误差约 ${Math.round(state.pos.acc)} 米` : '';
-  setWhere(state.label || `${state.pos.lat.toFixed(4)}, ${state.pos.lon.toFixed(4)}`, `${fmtD(state.radius)}内找到 ${state.places.length} 家${acc}`);
+  if (!state.pos) return;
+  const acc = state.pos.acc ? `定位误差约 ${Math.round(state.pos.acc)} 米` : '';
+  const found = state.dish && !state.busy && state.places.length ? `${fmtD(state.radius)}内有 ${state.places.length} 家卖「${state.dish.n}」` : '';
+  setWhere(state.label || `${state.pos.lat.toFixed(4)}, ${state.pos.lon.toFixed(4)}`, [found, acc].filter(Boolean).join('，'));
 }
 
-/* ---------- data: Google Places (optional) ---------- */
-const GMASK = ['id','displayName','location','rating','userRatingCount','priceLevel','currentOpeningHours.openNow','currentOpeningHours.weekdayDescriptions','regularOpeningHours.weekdayDescriptions','photos','primaryType','primaryTypeDisplayName','googleMapsUri','websiteUri','businessStatus','shortFormattedAddress','servesVegetarianFood','servesBreakfast','takeout','delivery'].map(f => 'places.' + f).join(',');
-async function gNearby(types, rank){
+/* ---------- data: Google Text Search ---------- */
+const PRICE = ['免费', '平价', '中等', '偏贵', '很贵'];
+const PRICE_KEY = {PRICE_LEVEL_FREE:0, PRICE_LEVEL_INEXPENSIVE:1, PRICE_LEVEL_MODERATE:2, PRICE_LEVEL_EXPENSIVE:3, PRICE_LEVEL_VERY_EXPENSIVE:4};
+const GMASK = ['id','displayName','location','rating','userRatingCount','priceLevel','currentOpeningHours.openNow','currentOpeningHours.weekdayDescriptions','regularOpeningHours.weekdayDescriptions','photos','primaryTypeDisplayName','googleMapsUri','shortFormattedAddress','businessStatus'].map(f => 'places.' + f).join(',');
+async function google(q){
   const {lat, lon} = state.pos;
-  const r = await tfetch('https://places.googleapis.com/v1/places:searchNearby', {method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':KEY,'X-Goog-FieldMask':GMASK},
-    body:JSON.stringify({includedTypes:types, maxResultCount:20, rankPreference:rank, languageCode:'zh-CN', regionCode:'MY', locationRestriction:{circle:{center:{latitude:lat, longitude:lon}, radius:state.radius}}})}, 15000);
+  const r = await tfetch('https://places.googleapis.com/v1/places:searchText', {method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':KEY,'X-Goog-FieldMask':GMASK},
+    body:JSON.stringify({textQuery:q, pageSize:20, languageCode:'zh-CN', regionCode:'MY', locationBias:{circle:{center:{latitude:lat, longitude:lon}, radius:Math.max(state.radius, 1000)}}})}, 15000);
   if (!r.ok) { const j = await r.json().catch(() => ({})); const e = new Error((j.error && j.error.message) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
-  return (await r.json()).places || [];
-}
-async function google(){
-  const lists = await Promise.all([gNearby(['restaurant'], 'DISTANCE'), gNearby(['restaurant'], 'POPULARITY'), gNearby(['cafe','coffee_shop','bakery','dessert_shop','fast_food_restaurant','food_court'], 'DISTANCE')]);
-  const seen = new Set(), out = [];
-  lists.flat().forEach(g => {
-    if (!g || seen.has(g.id) || !g.location) return; seen.add(g.id);
-    if (g.businessStatus && g.businessStatus !== 'OPERATIONAL') return;
+  return ((await r.json()).places || []).filter(g => g.location && (!g.businessStatus || g.businessStatus === 'OPERATIONAL')).map(g => {
     const name = (g.displayName && g.displayName.text) || '';
-    const hrs = (g.currentOpeningHours && g.currentOpeningHours.weekdayDescriptions) || (g.regularOpeningHours && g.regularOpeningHours.weekdayDescriptions) || null;
-    out.push({ id:'g' + g.id, n:name, lat:g.location.latitude, lon:g.location.longitude,
-      c:catOf(g.primaryType, name), kind:(g.primaryTypeDisplayName && g.primaryTypeDisplayName.text) || '', cu:'', street:g.shortFormattedAddress || '',
-      rating:g.rating, rc:g.userRatingCount, price:PRICE_KEY[g.priceLevel], open:g.currentOpeningHours ? g.currentOpeningHours.openNow : undefined, hrs,
-      photos:(g.photos || []).slice(0, 1).map(p => ({name:p.name, by:(p.authorAttributions || [])[0] || null})),
-      maps:g.googleMapsUri, web:g.websiteUri, veg:g.servesVegetarianFood, bfast:g.servesBreakfast,
-      halal:/halal|nasi kandar|mamak/i.test(name) || /halal/.test(g.primaryType || '') ? true : undefined });
+    return { id:'g' + g.id, n:name, lat:g.location.latitude, lon:g.location.longitude,
+      kind:(g.primaryTypeDisplayName && g.primaryTypeDisplayName.text) || '', street:g.shortFormattedAddress || '',
+      rating:g.rating, rc:g.userRatingCount, price:PRICE_KEY[g.priceLevel], open:g.currentOpeningHours ? g.currentOpeningHours.openNow : undefined,
+      hrs:(g.currentOpeningHours && g.currentOpeningHours.weekdayDescriptions) || (g.regularOpeningHours && g.regularOpeningHours.weekdayDescriptions) || null,
+      photo:(g.photos || [])[0] ? {name:g.photos[0].name, by:(g.photos[0].authorAttributions || [])[0] || null} : null, maps:g.googleMapsUri };
   });
-  return out;
 }
 const photoUrl = (p, w) => `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=${w || 800}&key=${encodeURIComponent(KEY)}`;
-
-/* ---------- data: OpenStreetMap (free) ---------- */
-async function photon(){
-  const {lat, lon} = state.pos, km = Math.max(0.3, state.radius/1000);
-  const lists = await Promise.all(Object.keys(KIND).map(k =>
-    tfetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&radius=${km}&limit=50&osm_tag=amenity:${k}`, {}, 12000)
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })));
-  const seen = new Set(), out = [];
-  lists.forEach(j => (j.features || []).forEach(f => {
-    const p = f.properties || {}, id = (p.osm_type || 'x').toLowerCase() + p.osm_id;
-    if (!p.name || seen.has(id)) return; seen.add(id);
-    const [lo, la] = f.geometry.coordinates;
-    out.push({id, n:p.name, lat:la, lon:lo, c:catOf(p.osm_value === 'cafe' ? 'cafe' : p.osm_value === 'fast_food' ? 'fast_food' : '', p.name), kind:KIND[p.osm_value], cu:'',
-      street:[p.housenumber, p.street].filter(Boolean).join(' ') || p.district || ''});
-  }));
-  return out.filter(p => dist(state.pos, p) <= state.radius * 1.05);
-}
-async function overpassPlaces(ms){
+async function photonSearch(q){
   const {lat, lon} = state.pos;
-  const q = `[out:json][timeout:20];(nwr["amenity"~"^(restaurant|cafe|fast_food|food_court)$"]["name"](around:${state.radius},${lat},${lon}););out tags center 300;`;
-  const r = await tfetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}}, ms);
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return (await r.json()).elements.map(e => {
-    const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, t = e.tags || {};
-    if (la == null) return null;
-    const cu = t.cuisine || '';
-    return { id:e.type[0] + e.id, n:t['name:zh'] && t['name:zh'] !== t.name ? `${t.name}（${t['name:zh']}）` : t.name, lat:la, lon:lo,
-      c:catOf(cu || (t.amenity === 'cafe' ? 'cafe' : t.amenity === 'fast_food' ? 'fast_food' : ''), t.name), kind:KIND[t.amenity],
-      cu:cu.replace(/_/g,' ').split(';').slice(0,3).join('、'), h:t.opening_hours || '',
-      halal:t['diet:halal'] === 'yes' || t['diet:halal'] === 'only' ? true : undefined, veg:t['diet:vegetarian'] === 'yes' || t['diet:vegetarian'] === 'only' ? true : undefined,
-      web:t.website || t['contact:website'] || '', menuUrl:t['website:menu'] || t.menu || '', street:[t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ') };
-  }).filter(Boolean);
+  const j = await (await tfetch(`https://photon.komoot.io/api/?limit=30&lat=${lat}&lon=${lon}&q=${encodeURIComponent(q)}`, {}, 12000)).json();
+  return (j.features || []).filter(f => (f.properties || {}).osm_key === 'amenity').map(f => {
+    const p = f.properties, [lo, la] = f.geometry.coordinates;
+    return {id:(p.osm_type || 'x').toLowerCase() + p.osm_id, n:p.name, lat:la, lon:lo, kind:p.osm_value, street:[p.housenumber, p.street].filter(Boolean).join(' ')};
+  }).filter(p => p.n);
 }
-const nkey = p => p.n.toLowerCase().replace(/[^a-z0-9一-鿿]/g, '');
 
-/* ---------- load ---------- */
+/* ---------- load results for the chosen dish ---------- */
+const cacheKey = () => `res|${state.dish.q}|${state.pos.lat.toFixed(3)},${state.pos.lon.toFixed(3)}|${state.radius}|${KEY ? 'g' : 'o'}`;
 async function load(note){
+  if (!state.dish || !state.pos) return;
   const my = ++state.req; state.busy = true;
-  setWhere('正在找附近的店…', ''); nameArea();
-  const shape = o => Object.assign(o, {d:dist(state.pos, {lat:o.lat, lon:o.lon})});
-  let got = null, src = '', err = '', gErr = '';
-  if (KEY) {
-    try { got = await google(); src = 'google'; } catch (e) { gErr = e.status === 403 || e.status === 400 ? '密钥无效或没有开启 Places API (New)' : (e.name === 'AbortError' ? '连接超时' : e.message); }
-    if (my !== state.req) return;
-  }
-  if (!got) {
-    try { got = await photon(); src = 'osm'; } catch (e) { err = e && e.name; }
-    if (my !== state.req) return;
-  }
-  if (!got) {
-    try { got = await overpassPlaces(15000); src = 'osm'; } catch (e) { err = e && e.name; }
-    if (my !== state.req) return;
-  }
+  const cache = store.get('res-cache') || {}, ck = cacheKey(), hit = cache[ck];
+  if (hit && Date.now() - hit.at < 6*3600*1000) { state.busy = false; state.src = hit.src; setPlaces(hit.places, note); return; }
+  setStatus(''); $('r-name').textContent = `正在找附近的「${state.dish.n}」…`; $('result').classList.add('idle');
+  let got = null, src = '', gErr = '';
+  if (KEY) { try { got = await google(state.dish.q); src = 'google'; } catch (e) { gErr = e.status === 429 ? '今天的查询次数用完了' : e.status === 403 || e.status === 400 ? '密钥无效或服务没开启' : (e.name === 'AbortError' ? '连接超时' : e.message); } }
+  if (my !== state.req) return;
+  if (!got) { try { got = await photonSearch(state.dish.q); src = 'osm'; } catch (e) {} }
+  if (my !== state.req) return;
   state.busy = false;
-  if (!got) {
-    state.places = []; chips('cond'); draw(true);
-    setWhere('查不到附近的店', framed ? '预览窗口挡住了联网，请在浏览器里打开' : '地图服务暂时连不上（' + (err === 'AbortError' ? '超时' : '网络错误') + '），点「定位」再试');
+  if (!got) { state.places = []; empty('查不到附近的店', '地图服务暂时连不上，过一会儿再试。'); return; }
+  const shaped = got.map(o => Object.assign(o, {d:dist(state.pos, o)})).filter(o => o.d <= Math.max(state.radius*1.25, 600)).sort((a,b) => a.d - b.d);
+  state.src = src;
+  const keep = {}; Object.keys(cache).forEach(k => { if (Date.now() - cache[k].at < 6*3600*1000) keep[k] = cache[k]; });
+  keep[ck] = {at:Date.now(), places:shaped, src}; store.set('res-cache', keep);
+  if (gErr) note = (note ? note + ' ' : '') + `Google 资料载入失败（${gErr}），先用免费地图资料，结果会比较少。`;
+  setPlaces(shaped, note);
+}
+function setPlaces(arr, note){
+  state.places = arr; state.seen = []; chips('cond'); footer();
+  setStatus(note || ''); whereLine(); pick();
+}
+
+/* ---------- pick & show ---------- */
+const pool = () => state.places.filter(p => [...state.conds].every(k => COND[k].f(p)));
+const mapsSearch = p => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([p.n, p.street].filter(Boolean).join(' '));
+const dishIcon = () => (state.dish && I[state.dish.i]) ? state.dish.i : '饭';
+function pick(){
+  list();
+  const c = pool();
+  if (!c.length) {
+    if (state.places.length) empty('没有符合条件的店', '少选一个条件，或把范围调大。');
+    else if (state.dish) empty(`附近没找到「${state.dish.n}」`, '把范围调大，或再转一次轮盘。');
     return;
   }
-  state.src = src;
-  if (gErr) note = (note ? note + ' ' : '') + 'Google 资料载入失败（' + gErr + '），先用免费地图资料。';
-  setPlaces(got.map(shape), note); whereLine(); footer();
-  if (src === 'osm') overpassPlaces(9000).then(more => {
-    if (my !== state.req || !more.length) return;
-    const byKey = new Map(state.places.map(p => [nkey(p), p]));
-    more.forEach(m => { const old = byKey.get(nkey(m));
-      if (old) { ['cu','h','halal','veg','web','menuUrl'].forEach(f => { if (!old[f] && m[f]) old[f] = m[f]; }); if (old.c === '其他') old.c = m.c; if (!old.street) old.street = m.street; }
-      else { state.places.push(shape(m)); byKey.set(nkey(m), m); } });
-    state.places.sort((a,b) => a.d - b.d); cache(); chips('cond'); list(); if (state.cur) show(state.cur); whereLine();
-  }).catch(() => {});
-}
-function cache(){ store.set('near-cache', {pos:state.pos, radius:state.radius, places:state.places, label:state.label, src:state.src, key:!!KEY, at:Date.now()}); }
-function setPlaces(arr, note){
-  state.places = arr.sort((a,b) => a.d - b.d); cache();
-  state.seen = []; state.note = note || ''; chips('cond'); chips('sort'); draw(true);
-}
-
-/* ---------- pick ---------- */
-const pool = () => state.places.filter(p => !isClosed(p) && (!state.cat || p.c === state.cat) && [...state.conds].every(k => COND[k].f(p)) && !state.skip.has(p.id));
-const mapsSearch = p => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([p.n, p.street, state.label].filter(Boolean).join(' '));
-function showPhoto(p, i){
-  state.ph = i;
-  const ph = p.photos && p.photos[i], box = $('photo');
-  if (!ph || !KEY) { box.className = 'photo noimg'; box.innerHTML = icon(CATS[p.c].i); return; }
-  box.className = 'photo';
-  const by = ph.by ? `<span class="credit">照片：${ph.by.uri ? `<a href="${esc(ph.by.uri)}" target="_blank" rel="noopener">${esc(ph.by.displayName)}</a>` : esc(ph.by.displayName)}</span>` : '';
-  const link = p.maps || mapsSearch(p);
-  box.innerHTML = `<a class="ph-link" href="${esc(link)}" target="_blank" rel="noopener" aria-label="在 Google 地图看 ${esc(p.n)} 的更多照片"><img src="${photoUrl(ph, 800)}" alt="${esc(p.n)} 的照片" loading="eager"><span class="more">更多照片 ›</span></a>` + by;
-  box.querySelector('img').onerror = () => { box.className = 'photo noimg'; box.innerHTML = icon(CATS[p.c].i); };
-  [...$('thumbs').children].forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+  let fresh = c.filter(p => !state.seen.includes(p.id));
+  if (!fresh.length) { state.seen = state.cur && c.length > 1 ? [state.cur.id] : []; fresh = c.filter(p => !state.seen.includes(p.id)); }
+  // favour closer and better-rated shops, but keep it random
+  const w = fresh.map(p => 1 / (1 + p.d/600) * (p.rating ? (p.rating/4) ** 2 : .8));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0), win = fresh[0];
+  for (let i = 0; i < fresh.length; i++) { r -= w[i]; if (r <= 0) { win = fresh[i]; break; } }
+  state.seen.push(win.id); show(win);
 }
 function show(p){
-  state.cur = p; $('gone').hidden = state.src === 'google';
-  const photos = KEY && p.photos ? p.photos : [];
-  $('thumbs').innerHTML = false ? photos.map((ph, j) => `<button type="button" data-ph="${j}" aria-label="第 ${j+1} 张照片" aria-pressed="${j===0}"><img src="${photoUrl(ph, 800)}" alt="" loading="lazy"></button>`).join('') : '';
-  showPhoto(p, 0);
+  state.cur = p; $('result').classList.remove('idle');
+  const box = $('photo');
+  if (p.photo && KEY) {
+    box.className = 'photo';
+    const by = p.photo.by ? `<span class="credit">照片：${p.photo.by.uri ? `<a href="${esc(p.photo.by.uri)}" target="_blank" rel="noopener">${esc(p.photo.by.displayName)}</a>` : esc(p.photo.by.displayName)}</span>` : '';
+    box.innerHTML = `<a class="ph-link" href="${esc(p.maps || mapsSearch(p))}" target="_blank" rel="noopener" aria-label="在 Google 地图看 ${esc(p.n)} 的更多照片"><img src="${photoUrl(p.photo, 800)}" alt="${esc(p.n)} 的照片"><span class="more">更多照片 ›</span></a>` + by;
+    box.querySelector('img').onerror = () => { box.className = 'photo noimg'; box.innerHTML = icon(dishIcon()); };
+  } else { box.className = 'photo noimg'; box.innerHTML = icon(dishIcon()); }
+  $('eyebrow').textContent = `推荐这家「${state.dish ? state.dish.n : ''}」`;
   $('r-name').textContent = p.n;
-  $('r-dish').textContent = [p.kind, p.cu || p.street].filter(Boolean).join(' · ');
+  $('r-dish').textContent = [p.kind, p.street].filter(Boolean).join(' · ');
   const t = [`<span class="tag dark">${fmtD(p.d)}</span>`, `<span class="tag">走路约 ${Math.max(1, Math.round(p.d/75))} 分钟</span>`];
   if (p.rating != null) t.push(`<span class="tag">★ ${p.rating.toFixed(1)}${p.rc ? `（${p.rc}）` : ''}</span>`);
   if (p.price != null) t.push(`<span class="tag">${PRICE[p.price]}</span>`);
   if (p.open === true) t.push('<span class="tag on">营业中</span>'); else if (p.open === false) t.push('<span class="tag off">休息中</span>');
-  t.push(`<span class="tag">${esc(p.c)}</span>`);
-  if (p.halal) t.push('<span class="tag">清真</span>');
-  if (p.veg) t.push('<span class="tag">有素食</span>');
   $('r-meta').innerHTML = t.join('');
-  $('r-hours').innerHTML = p.hrs && p.hrs.length ? `<details><summary>营业时间</summary><ul>${p.hrs.map(h => `<li>${esc(h)}</li>`).join('')}</ul></details>`
-    : p.h ? '营业：' + esc(p.h) : '地图资料里没有营业时间';
-  $('menu').href = p.menuUrl || p.maps || mapsSearch(p);
-  $('menu').title = p.menuUrl ? '打开店家的菜单' : '在 Google 地图看菜单、照片和评价';
+  $('r-hours').innerHTML = p.hrs && p.hrs.length ? `<details><summary>营业时间</summary><ul>${p.hrs.map(h => `<li>${esc(h)}</li>`).join('')}</ul></details>` : '';
+  $('menu').href = p.maps || mapsSearch(p);
   $('nav').href = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
   document.querySelectorAll('#list li').forEach(li => li.style.background = li.dataset.id === p.id ? 'var(--sand)' : '');
 }
-function empty(){
-  state.cur = null; $('thumbs').innerHTML = '';
-  $('photo').className = 'photo noimg'; $('photo').innerHTML = icon('饭');
-  const filtered = state.places.length > 0;
-  $('r-name').textContent = filtered ? '没有符合条件的店' : (state.pos ? '附近没找到店' : '等你的位置');
-  $('r-dish').textContent = filtered ? '少选一个条件、换个类型，或把范围调大。' : state.pos ? '把范围调大再试试。' : '允许定位，或在上面输入地点。';
-  $('r-meta').innerHTML = ''; $('r-hours').innerHTML = ''; $('gone').hidden = true;
+function empty(title, sub){
+  state.cur = null; $('result').classList.add('idle');
+  $('photo').className = 'photo noimg'; $('photo').innerHTML = icon(dishIcon());
+  $('eyebrow').textContent = '推荐这家'; $('r-name').textContent = title; $('r-dish').textContent = sub || '';
+  $('r-meta').innerHTML = ''; $('r-hours').innerHTML = '';
   $('nav').removeAttribute('href'); $('menu').removeAttribute('href');
 }
-let timer = null;
-function draw(instant){
-  clearInterval(timer); $('result').classList.remove('spinning');
-  const c = pool(); list();
-  if (!c.length) { empty(); return; }
-  let fresh = c.filter(p => !state.seen.includes(p.id));
-  if (!fresh.length) { state.seen = state.cur && c.length > 1 ? [state.cur.id] : []; fresh = c.filter(p => !state.seen.includes(p.id)); }
-  const win = fresh[Math.floor(Math.random()*fresh.length)]; state.seen.push(win.id);
-  if (instant || matchMedia('(prefers-reduced-motion: reduce)').matches || c.length < 2) { show(win); return; }
-  const box = $('result'); box.classList.add('spinning'); let i = 0;
-  $('photo').className = 'photo noimg'; $('thumbs').innerHTML = '';
-  timer = setInterval(() => { const r = c[Math.floor(Math.random()*c.length)]; $('r-name').textContent = r.n; $('photo').innerHTML = icon(CATS[r.c].i);
-    if (++i > 12) { clearInterval(timer); box.classList.remove('spinning'); show(win); } }, 70);
+function resetResult(){
+  state.places = []; state.seen = []; chips('cond'); list(); setStatus('');
+  $('s2-sub').textContent = '转到之后，这里会推荐附近的店'; $('list-title').textContent = '附近的店';
+  empty('先转轮盘', ''); whereLine();
 }
 function list(){
   const ok = new Set(pool().map(p => p.id));
-  const hid = state.places.filter(isClosed).length;
-  $('count').textContent = state.places.length ? `${ok.size} / ${state.places.length - hid} 家` : '';
-  $('closed-note').innerHTML = closed.size ? `你标记了 ${closed.size} 家倒闭的店，${hid ? `这附近有 ${hid} 家已隐藏。` : ''}<button type="button" id="closed-reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : '';
-  let arr = state.places.filter(p => !isClosed(p));
+  $('count').textContent = state.places.length ? `${ok.size} / ${state.places.length} 家` : '';
+  let arr = state.places.slice();
   if (state.sort === 'rating') arr.sort((a,b) => (b.rating || 0) - (a.rating || 0) || a.d - b.d);
-  if (state.sort === 'random') arr.sort(() => Math.random() - .5);
   arr.sort((a,b) => ok.has(b.id) - ok.has(a.id));
-  $('list').innerHTML = arr.slice(0, 150).map(p => {
-    const sub = [p.c, p.rating != null ? '★' + p.rating.toFixed(1) : '', p.price != null ? PRICE[p.price] : '', p.open === true ? '营业中' : p.open === false ? '休息中' : '', p.cu, state.skip.has(p.id) ? '今天已排除' : ''].filter(Boolean).join('　·　');
+  $('list').innerHTML = arr.map(p => {
+    const sub = [p.rating != null ? '★' + p.rating.toFixed(1) : '', p.price != null ? PRICE[p.price] : '', p.open === true ? '营业中' : p.open === false ? '休息中' : '', p.street].filter(Boolean).join('　·　');
     return `<li class="${ok.has(p.id) ? '' : 'off'}" data-id="${esc(p.id)}">
       <button type="button" class="pickme" style="all:unset;cursor:pointer;display:block"><strong>${esc(p.n)}</strong><small>${esc(sub)}</small></button>
       <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" rel="noopener">${fmtD(p.d)}</a></li>`;
   }).join('');
-  const n = state.skip.size;
-  $('status').innerHTML = (lastClosed ? `已把「${esc(lastClosed.n)}」标为倒闭，以后不会再抽到。<button type="button" id="undo-closed" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">撤销</button> ` : '') + (state.note ? esc(state.note) + ' ' : '') + (n ? `今天排除了 ${n} 家。<button type="button" id="reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : '');
-  state.note = '';
 }
 function footer(){
-  $('foot').innerHTML = state.src === 'google'
-    ? '店家资料、照片和评分来自 Google 地图。'
-    : '店家资料来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>（经 Photon 和 Overpass 查询），小档口和新店可能没收录。「菜单·照片」会打开 Google 地图搜索这家店。';
-  $('keystate').textContent = state.src === 'google' ? '已解锁' : '已解锁（Google 资料暂时载入失败）';
+  $('foot').innerHTML = state.src === 'osm'
+    ? '这次的结果来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>，比较不全。'
+    : '店家资料、照片和评分来自 Google 地图。';
 }
 
+/* ---------- wheel editing ---------- */
+function renderEdit(){
+  $('edit-occ').textContent = OCC[state.occ];
+  $('edit-list').innerHTML = getItems(state.occ).map((it, i) => `<span>${esc(it.n)}<button type="button" data-del="${i}" aria-label="删除 ${esc(it.n)}">×</button></span>`).join('');
+}
+$('edit-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b || spinning) return;
+  const list = getItems(state.occ); if (list.length <= 2) { b.blur(); return; }
+  list.splice(Number(b.dataset.del), 1); setItems(state.occ, list);
+  state.dish = null; state.dishIdx = -1; renderEdit(); drawWheel();
+});
+function addItem(){
+  const v = $('edit-in').value.trim(); if (!v || spinning) return;
+  const list = getItems(state.occ); if (list.some(it => it.n === v)) { $('edit-in').value = ''; return; }
+  list.push({n:v, q:v, i:'饭'}); setItems(state.occ, list); $('edit-in').value = '';
+  state.dishIdx = -1; renderEdit(); drawWheel();
+}
+$('edit-addbtn').addEventListener('click', addItem);
+$('edit-in').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } });
+$('edit-reset').addEventListener('click', () => { if (spinning) return; store.del(itemsKey(state.occ)); state.dishIdx = -1; renderEdit(); drawWheel(); });
+
 /* ---------- events ---------- */
-$('go').addEventListener('click', () => { lastClosed = null; draw(false); });
-$('nope').addEventListener('click', () => { if (state.cur) { state.skip.add(state.cur.id); saveSkip(); } draw(false); });
+$('spin').addEventListener('click', spin);
+$('next').addEventListener('click', () => { if (state.places.length) pick(); else spin(); });
 $('relocate').addEventListener('click', () => locate(false));
 $('manual-go').addEventListener('click', manual);
 $('place').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); manual(); } });
-$('thumbs').addEventListener('click', e => { const b = e.target.closest('[data-ph]'); if (b && state.cur) showPhoto(state.cur, Number(b.dataset.ph)); });
-$('status').addEventListener('click', e => {
-  if (e.target.id === 'reset') { state.skip.clear(); saveSkip(); draw(true); }
-  if (e.target.id === 'undo-closed' && lastClosed) { closed.delete(ckey(lastClosed)); saveClosed(); const p = lastClosed; lastClosed = null; list(); show(p); chips('cond'); }
-});
-$('gone').addEventListener('click', () => { const p = state.cur; if (!p) return; closed.add(ckey(p)); saveClosed(); lastClosed = p; draw(false); });
-$('closed-note').addEventListener('click', e => { if (e.target.id === 'closed-reset') { closed.clear(); saveClosed(); lastClosed = null; draw(true); } });
 $('list').addEventListener('click', e => {
   const b = e.target.closest('.pickme'); if (!b) return;
   const p = state.places.find(x => x.id === b.closest('li').dataset.id);
-  clearInterval(timer); $('result').classList.remove('spinning');
-  if (state.skip.delete(p.id)) saveSkip();
-  list(); show(p); $('result').scrollIntoView({block:'center', behavior:'smooth'});
+  show(p); $('result').scrollIntoView({block:'center', behavior:'smooth'});
 });
 document.addEventListener('visibilitychange', () => { if (KEY && document.visibilityState === 'visible' && navigator.geolocation) locate(true); });
 
 function boot(){
-chips('radius'); chips('cat'); chips('sort'); footer();
-const cached = store.get('near-cache');
-if (cached && Date.now() - cached.at < 6*3600*1000 && cached.key === !!KEY) {
-  Object.assign(state, {pos:cached.pos, radius:cached.radius, places:cached.places, label:cached.label, src:cached.src});
-  chips('radius'); chips('cond'); chips('sort'); draw(true); whereLine(); footer(); locate(true);
-} else { chips('cond'); empty(); list(); locate(false); }
+  state.dishIdx = -1;
+  chips('occ'); chips('radius'); chips('sort'); chips('cond'); renderEdit(); drawWheel(); resetResult(); footer();
+  locate(false);
 }
+
+/* ---------- passcode lock ---------- */
 const VAULT = {"s": "H1OKS72lYJBWvpQd58pDUA==", "i": "Oe2vGZ1s+DSVSkje", "c": "pkHYJzVfdFLbpwFNS31kqhSQPBJv6WSFZIqPmBRwUwR63kw/ve+kzLapSrHyWjYxwCmvucPxBw==", "n": 250000};
 const b64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
 async function unlock(pw){
@@ -652,8 +678,8 @@ $('lock-form').addEventListener('submit', async e => {
   }
   $('lock-go').disabled = false;
 });
-$('relock').addEventListener('click', () => { KEY = ''; store.del('gkey'); store.del('near-cache'); location.reload(); });
-if (KEY) boot(); else { $('lock').hidden = false; setTimeout(() => $('lock-pw').focus(), 50); }
+$('relock').addEventListener('click', () => { KEY = ''; store.del('gkey'); store.del('res-cache'); location.reload(); });
+if (KEY) boot(); else { $('lock').hidden = false; drawWheel(); setTimeout(() => $('lock-pw').focus(), 50); }
 </script>
 </body>
 </html>
