@@ -118,12 +118,31 @@ li.off{opacity:.4}
 .keyrow{display:flex;gap:6px}
 .keyrow input{flex:1;min-width:0;border:1px solid var(--line);padding:8px 10px;font:inherit;background:var(--card);color:var(--ink)}
 .keyrow button{border:1.5px solid var(--ink);background:none;font-weight:700;padding:6px 12px}
+.lock{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:24px}
+.lock[hidden]{display:none}
+.lockbox{width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px}
+.lockbox p{margin:0;color:var(--muted);font-size:14px}
+.lockbox form{display:flex;gap:6px}
+.lockbox input{flex:1;min-width:0;border:1.5px solid var(--ink);padding:10px 12px;font:inherit;background:var(--card);color:var(--ink);border-radius:0}
+.lockbox button{border:1.5px solid var(--accent);background:var(--accent);color:#fff;font-weight:700;padding:0 18px}
+.lockbox .lockmsg{color:var(--accent);min-height:1.4em}
 .foot{font-size:11.5px;color:var(--muted);margin:0}
 @media (max-width:380px){h1{font-size:34px}.pick h2{font-size:24px}.actions > *{font-size:13px}}
 @media (prefers-reduced-motion:no-preference){.photo .ico svg{transition:transform .25s}.spinning .photo .ico svg{transform:rotate(-8deg) scale(.94)}}
 </style>
 </head>
 <body>
+<div class="lock" id="lock" hidden>
+  <div class="lockbox">
+    <h1>今天吃什么</h1>
+    <p>这个页面需要通行码才能使用。</p>
+    <form id="lock-form" autocomplete="off">
+      <input id="lock-pw" type="password" placeholder="输入通行码" aria-label="通行码" autocomplete="current-password">
+      <button type="submit" id="lock-go">解锁</button>
+    </form>
+    <p class="lockmsg" id="lock-msg" aria-live="polite"></p>
+  </div>
+</div>
 <main class="wrap">
 <svg class="scene" viewBox="0 0 496 230" role="img" aria-label="几何插画：骑楼店屋、一碗面、点心蒸笼和拉茶">
   <rect width="496" height="230" fill="#f7f0df"/>
@@ -228,20 +247,10 @@ li.off{opacity:.4}
   <ol id="list"></ol>
 </details>
 <details class="fold last" id="keyfold">
-  <summary>照片和评分<span id="keystate">未开启</span></summary>
+  <summary>这台设备<span id="keystate">已解锁</span></summary>
   <div class="keybox">
-    <p>免费地图资料没有照片、评分和价位。填入你自己的 Google Maps API 密钥后，会改用 Google 地图的资料，并多出「营业中」「4 分以上」「平价」「素食」「有早餐」等筛选。密钥只存在这台设备的浏览器里，不会上传到网站。</p>
-    <ol>
-      <li>在 Google Cloud 建一个项目并绑定付款方式（每月有免费额度，个人用一般不会超）。</li>
-      <li>启用 <b>Places API (New)</b>，到「凭据」新建 API 密钥。</li>
-      <li>限制密钥：网站限制填 <b>https://jakekonlife.github.io/*</b>，API 限制只勾 Places API (New)。</li>
-    </ol>
-    <div class="keyrow">
-      <input id="gkey" type="password" autocomplete="off" placeholder="粘贴 API 密钥" aria-label="Google Maps API 密钥">
-      <button type="button" id="gkey-save">保存</button>
-      <button type="button" id="gkey-clear">清除</button>
-    </div>
-    <p id="gkey-msg"></p>
+    <p>这台设备已用通行码解锁，会显示 Google 地图的照片、评分和营业状态。不想让这台设备继续使用，可以锁回去，下次打开需要重新输入通行码。</p>
+    <div class="keyrow"><button type="button" id="relock">锁上这台设备</button></div>
   </div>
 </details>
 
@@ -589,7 +598,7 @@ function footer(){
   $('foot').innerHTML = state.src === 'google'
     ? '店家资料、照片和评分来自 Google 地图。'
     : '店家资料来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>（经 Photon 和 Overpass 查询），小档口和新店可能没收录。「菜单·照片」会打开 Google 地图搜索这家店。';
-  $('keystate').textContent = KEY ? (state.src === 'google' ? '已开启' : '已填密钥，但没生效') : '未开启';
+  $('keystate').textContent = state.src === 'google' ? '已解锁' : '已解锁（Google 资料暂时载入失败）';
 }
 
 /* ---------- events ---------- */
@@ -612,20 +621,39 @@ $('list').addEventListener('click', e => {
   if (state.skip.delete(p.id)) saveSkip();
   list(); show(p); $('result').scrollIntoView({block:'center', behavior:'smooth'});
 });
-$('gkey-save').addEventListener('click', () => {
-  const v = $('gkey').value.trim(); if (!v) { $('gkey-msg').textContent = '请先粘贴密钥。'; return; }
-  KEY = v; store.set('gkey', v); $('gkey').value = ''; $('gkey-msg').textContent = '已保存，正在用 Google 资料重新查找…';
-  footer(); if (state.pos) load(); else $('gkey-msg').textContent = '已保存。定位或输入地点后会用 Google 资料。';
-});
-$('gkey-clear').addEventListener('click', () => { KEY = ''; store.del('gkey'); $('gkey-msg').textContent = '已清除，改回免费地图资料。'; footer(); if (state.pos) load(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && navigator.geolocation) locate(true); });
+document.addEventListener('visibilitychange', () => { if (KEY && document.visibilityState === 'visible' && navigator.geolocation) locate(true); });
 
+function boot(){
 chips('radius'); chips('cat'); chips('sort'); footer();
 const cached = store.get('near-cache');
 if (cached && Date.now() - cached.at < 6*3600*1000 && cached.key === !!KEY) {
   Object.assign(state, {pos:cached.pos, radius:cached.radius, places:cached.places, label:cached.label, src:cached.src});
   chips('radius'); chips('cond'); chips('sort'); draw(true); whereLine(); footer(); locate(true);
 } else { chips('cond'); empty(); list(); locate(false); }
+}
+const VAULT = {"s": "H1OKS72lYJBWvpQd58pDUA==", "i": "Oe2vGZ1s+DSVSkje", "c": "pkHYJzVfdFLbpwFNS31kqhSQPBJv6WSFZIqPmBRwUwR63kw/ve+kzLapSrHyWjYxwCmvucPxBw==", "n": 250000};
+const b64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
+async function unlock(pw){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  const k = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64(VAULT.s), iterations:VAULT.n, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const out = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(VAULT.i)}, k, b64(VAULT.c));
+  return new TextDecoder().decode(out);
+}
+$('lock-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pw = $('lock-pw').value.trim(); if (!pw) { $('lock-pw').focus(); return; }
+  $('lock-go').disabled = true; $('lock-msg').textContent = '正在解锁…';
+  try {
+    KEY = await unlock(pw); store.set('gkey', KEY);
+    $('lock').hidden = true; $('lock-pw').value = ''; $('lock-msg').textContent = '';
+    boot();
+  } catch (err) {
+    $('lock-msg').textContent = window.crypto && crypto.subtle ? '通行码不对，再试一次。' : '这个浏览器不支持解锁，请用 Chrome 或 Safari 打开。';
+  }
+  $('lock-go').disabled = false;
+});
+$('relock').addEventListener('click', () => { KEY = ''; store.del('gkey'); store.del('near-cache'); location.reload(); });
+if (KEY) boot(); else { $('lock').hidden = false; setTimeout(() => $('lock-pw').focus(), 50); }
 </script>
 </body>
 </html>
