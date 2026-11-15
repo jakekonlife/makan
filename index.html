@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f0df">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="吃什么">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>附近今天吃什么</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+QingKe+HuangYou&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one calm paper column; a single accent colour is reserved for the pick and the main button. */
+:root{
+  color-scheme: light;
+  --paper:#f7f0df; --card:#fffaf0; --sand:#f0dfb8;
+  --ink:#0f3d4a; --muted:#5b777d; --line:rgba(15,61,74,.18);
+  --accent:#e8553a;
+  --display:"ZCOOL QingKe HuangYou","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+a{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.scene{display:block;width:calc(100% + 32px);margin:0 -16px;height:auto;max-width:none}
+@media (min-width:512px){.scene{width:100%;margin:16px 0 0}}
+
+.head{display:flex;flex-direction:column;gap:4px}
+h1{font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;margin:0;letter-spacing:2px}
+.loc{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.loc p{margin:0;font-size:13px;color:var(--muted);min-width:0}
+.loc p b{color:var(--ink);font-weight:700;margin-right:6px}
+.link{border:0;background:none;padding:0;font-size:13px;font-weight:700;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+
+.result{display:grid;grid-template-columns:112px 1fr;background:var(--card);border:1.5px solid var(--ink)}
+.tile{background:var(--ink);display:flex;align-items:center;justify-content:center;padding:10px}
+.tile svg{width:100%;height:auto;display:block}
+.pick{padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--accent)}
+.pick h2{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.15;margin:0;overflow-wrap:anywhere;text-wrap:balance}
+.dish{font-size:14px;margin:0;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.tag,.tag.line,.tag.ok,.tag.warn{font-size:12px;font-weight:500;padding:1px 8px;border:1px solid var(--line);background:none;color:var(--ink)}
+.tag:first-child{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.hours{font-size:12.5px;margin:0;color:var(--muted)}
+.spinning h2{color:var(--accent)}
+
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions > *{border:1.5px solid var(--ink);background:none;padding:11px 8px;text-align:center;text-decoration:none;font-weight:700;font-size:14px;display:block}
+.actions > .go{grid-column:1 / -1;background:var(--accent);border-color:var(--accent);color:#fff;font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:3px;padding:13px 8px}
+.go:active{transform:translateY(1px)}
+.status{margin:-8px 0 0;font-size:12.5px;color:var(--muted);min-height:0}
+.status:empty{display:none}
+
+.filters{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:10px;align-items:baseline}
+.row > span{flex:0 0 2.6em;font-size:12.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:none;padding:2px 10px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card);font-weight:500}
+
+details{border-top:1.5px solid var(--ink)}
+details + details{margin-top:-18px;border-top:1px solid var(--line)}
+details:last-of-type{border-bottom:1.5px solid var(--ink)}
+summary{cursor:pointer;padding:12px 0;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"展开";font-size:12.5px;font-weight:400;color:var(--muted)}
+details[open] > summary::after{content:"收起"}
+summary span{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;margin-right:auto}
+.hint{margin:0 0 6px;font-size:12.5px;color:var(--muted)}
+ol{list-style:none;margin:0 0 8px;padding:0}
+li{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;padding:8px 6px;border-top:1px solid var(--line)}
+li .bar{display:none}
+li strong{display:block;font-size:14px;line-height:1.35;font-weight:500;overflow-wrap:anywhere}
+li small{display:block;font-size:12px;color:var(--muted)}
+li a{font-size:12.5px;white-space:nowrap;color:var(--muted)}
+li.off{opacity:.4}
+.manual{display:flex;gap:8px;padding:0 0 14px}
+.manual input{flex:1;min-width:0;border:1px solid var(--line);padding:8px 10px;font:inherit;background:var(--card);color:var(--ink)}
+.manual button{border:1.5px solid var(--ink);background:none;font-weight:700;padding:8px 14px}
+.foot{font-size:11.5px;color:var(--muted);margin:0}
+@media (max-width:380px){h1{font-size:34px}.result{grid-template-columns:88px 1fr}.pick h2{font-size:24px}}
+@media (prefers-reduced-motion:no-preference){.tile svg{transition:transform .25s}.spinning .tile svg{transform:rotate(-8deg) scale(.94)}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<svg class="scene" viewBox="0 0 496 230" role="img" aria-label="几何插画：骑楼店屋、一碗面、点心蒸笼和拉茶">
+  <rect width="496" height="230" fill="#f7f0df"/>
+  <g stroke="#f0dfb8" stroke-width="2" opacity=".9"><path d="M0 26h496M0 38h496M0 50h496M0 62h496"/></g>
+  <circle cx="412" cy="58" r="34" fill="#f0dfb8"/><circle cx="412" cy="58" r="22" fill="#e8553a"/>
+  <path d="M40 40q8-8 16 0q8-8 16 0" fill="none" stroke="#0f3d4a" stroke-width="3"/>
+  <path d="M300 30q6-6 12 0q6-6 12 0" fill="none" stroke="#0f3d4a" stroke-width="3"/>
+  <!-- hill + MRT viaduct -->
+  <path d="M0 150 Q120 70 250 150Z" fill="#3f7f85"/><path d="M230 150 Q360 96 496 150Z" fill="#7fb3b5"/>
+  <rect x="0" y="118" width="496" height="8" fill="#0f3d4a"/>
+  <g fill="#0f3d4a"><rect x="60" y="126" width="8" height="30"/><rect x="200" y="126" width="8" height="30"/><rect x="340" y="126" width="8" height="30"/><rect x="470" y="126" width="8" height="30"/></g>
+  <rect x="250" y="102" width="112" height="16" rx="6" fill="#e8553a"/><g fill="#fffaf0"><rect x="258" y="106" width="14" height="7"/><rect x="278" y="106" width="14" height="7"/><rect x="298" y="106" width="14" height="7"/><rect x="318" y="106" width="14" height="7"/><rect x="338" y="106" width="14" height="7"/></g>
+  <!-- shophouses -->
+  <g>
+    <rect x="14" y="96" width="70" height="104" fill="#e8553a"/><path d="M14 96l35-22l35 22z" fill="#0f3d4a"/>
+    <g fill="#f0dfb8"><path d="M24 136v-14a8 8 0 0 1 16 0v14z"/><path d="M58 136v-14a8 8 0 0 1 16 0v14z"/></g>
+    <rect x="14" y="146" width="70" height="10" fill="#fffaf0"/><g fill="#7fb3b5"><rect x="14" y="146" width="10" height="10"/><rect x="34" y="146" width="10" height="10"/><rect x="54" y="146" width="10" height="10"/><rect x="74" y="146" width="10" height="10"/></g>
+    <rect x="26" y="164" width="18" height="36" fill="#0f3d4a"/><rect x="52" y="164" width="22" height="20" fill="#f7f0df"/>
+  </g>
+  <g>
+    <rect x="84" y="84" width="74" height="116" fill="#f0dfb8"/><rect x="84" y="76" width="74" height="10" fill="#f0dfb8"/>
+    <g fill="#7fb3b5"><rect x="94" y="98" width="14" height="26"/><rect x="114" y="98" width="14" height="26"/><rect x="134" y="98" width="14" height="26"/></g>
+    <g stroke="#fffaf0" stroke-width="2"><path d="M94 111h14M114 111h14M134 111h14"/></g>
+    <rect x="84" y="136" width="74" height="14" fill="#e8553a"/><g fill="#fffaf0"><circle cx="100" cy="143" r="3"/><circle cx="121" cy="143" r="3"/><circle cx="142" cy="143" r="3"/></g>
+    <path d="M96 200v-30a14 14 0 0 1 28 0v30z" fill="#0f3d4a"/><rect x="132" y="162" width="18" height="38" fill="#3f7f85"/>
+  </g>
+  <g>
+    <rect x="158" y="104" width="62" height="96" fill="#7fb3b5"/><path d="M158 104h62l-8-14h-46z" fill="#e8553a"/>
+    <g fill="#f7f0df"><circle cx="176" cy="126" r="9"/><circle cx="202" cy="126" r="9"/></g><g fill="#0f3d4a"><circle cx="176" cy="126" r="4"/><circle cx="202" cy="126" r="4"/></g>
+    <g stroke="#f0dfb8" stroke-width="3"><path d="M158 146h62M158 154h62"/></g>
+    <rect x="168" y="166" width="42" height="34" fill="#f7f0df"/><path d="M168 166h42v8h-42z" fill="#f0dfb8"/>
+  </g>
+  <!-- palm -->
+  <rect x="234" y="140" width="6" height="60" fill="#0f3d4a"/>
+  <g fill="#3f7f85"><path d="M237 142q-26-14-40 4q22-6 40-4z"/><path d="M237 142q26-14 40 4q-22-6-40-4z"/><path d="M237 142q-12-26-34-22q22 4 34 22z"/><path d="M237 142q12-26 34-22q-22 4-34 22z"/></g>
+  <!-- ground bands -->
+  <rect x="0" y="200" width="496" height="30" fill="#0f3d4a"/>
+  <g fill="#f0dfb8"><rect x="20" y="213" width="34" height="4"/><rect x="92" y="213" width="34" height="4"/><rect x="164" y="213" width="34" height="4"/><rect x="236" y="213" width="34" height="4"/></g>
+  <!-- noodle bowl -->
+  <g>
+    <path d="M286 158q4-14 0-24M306 158q4-14 0-24M326 158q4-14 0-24" fill="none" stroke="#0f3d4a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M262 168h100a50 50 0 0 1-100 0z" fill="#e8553a"/><rect x="262" y="164" width="100" height="8" fill="#fffaf0"/>
+    <path d="M276 164q10-12 20 0q10-12 20 0q10-12 20 0q8-10 14 0" fill="none" stroke="#f0dfb8" stroke-width="5"/>
+    <circle cx="330" cy="160" r="9" fill="#fffaf0"/><circle cx="330" cy="160" r="4" fill="#f0dfb8"/>
+    <path d="M272 190h80" stroke="#f0dfb8" stroke-width="4"/><rect x="292" y="212" width="40" height="8" fill="#f0dfb8"/>
+    <path d="M350 122l-44 44M362 128l-48 40" stroke="#0f3d4a" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <!-- dim sum baskets -->
+  <g>
+    <rect x="384" y="176" width="64" height="24" fill="#f0dfb8"/><rect x="384" y="184" width="64" height="4" fill="#0f3d4a"/>
+    <rect x="390" y="152" width="52" height="24" fill="#f0dfb8"/><rect x="390" y="160" width="52" height="4" fill="#0f3d4a"/>
+    <path d="M394 152a22 14 0 0 1 44 0z" fill="#e8553a"/><circle cx="416" cy="136" r="4" fill="#0f3d4a"/>
+  </g>
+  <!-- teh tarik -->
+  <g>
+    <rect x="460" y="164" width="24" height="36" fill="#fffaf0"/><rect x="460" y="176" width="24" height="24" fill="#f0dfb8"/><rect x="460" y="164" width="24" height="5" fill="#7fb3b5"/>
+    <path d="M472 150v-22" stroke="#f0dfb8" stroke-width="5"/>
+  </g>
+</svg>
+<header class="head">
+  <h1>今天吃什么</h1>
+  <div class="loc">
+    <p><b id="where">正在定位…</b><span id="where2">请在浏览器弹窗里允许使用位置</span></p>
+    <button type="button" class="link" id="relocate">重新定位</button>
+  </div>
+</header>
+
+<section class="result" id="result" aria-live="polite">
+  <div class="tile" id="tile"></div>
+  <div class="pick">
+    <div class="eyebrow">这一餐去</div>
+    <h2 id="r-name">—</h2>
+    <p class="dish" id="r-dish"></p>
+    <div class="meta" id="r-meta"></div>
+    <p class="hours" id="r-hours"></p>
+  </div>
+</section>
+
+<div class="actions">
+  <button class="go" id="go" type="button">再抽一家</button>
+  <button class="nope" id="nope" type="button">今天不想吃这家</button>
+  <a class="nav" id="nav" target="_blank" rel="noopener">带我去</a>
+</div>
+<p class="status" id="status"></p>
+
+<section class="filters" aria-label="筛选">
+  <div class="row"><span>范围</span><div class="chips" id="f-radius"></div></div>
+  <div class="row"><span>想吃</span><div class="chips" id="f-cat"></div></div>
+</section>
+
+<details>
+  <summary>附近的店<span id="count"></span></summary>
+  <p class="hint">由近到远。点店名直接选它，点距离打开导航。</p>
+  <ol id="list"></ol>
+</details>
+<details>
+  <summary>手动输入地点</summary>
+  <div class="manual" id="manual">
+    <input id="place" type="text" placeholder="例如 Sri Petaling" aria-label="输入地名">
+    <button type="button" id="manual-go">用这里</button>
+  </div>
+</details>
+
+<p class="foot">店家资料来自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 贡献者</a>，没有评分，小档口和新店可能没收录。你的位置只用来查附近的店和地名，不会存到别处。</p>
+</main>
+<script>
+const I = {
+'面':'<path d="M30 62h80a40 40 0 0 1-80 0z" fill="#e8553a"/><rect x="30" y="58" width="80" height="7" fill="#fffaf0"/><path d="M40 58q8-11 16 0q8-11 16 0q8-11 16 0q7-9 12 0" fill="none" stroke="#f0dfb8" stroke-width="5"/><path d="M102 22l-40 40M112 28l-42 34" stroke="#7fb3b5" stroke-width="4" stroke-linecap="round"/><rect x="54" y="100" width="32" height="7" fill="#f0dfb8"/><path d="M46 46q4-10 0-18M62 44q4-10 0-18" fill="none" stroke="#fffaf0" stroke-width="3" stroke-linecap="round"/>',
+'饭':'<ellipse cx="70" cy="82" rx="54" ry="18" fill="#fffaf0"/><ellipse cx="70" cy="80" rx="42" ry="12" fill="#3f7f85"/><path d="M48 78a22 22 0 0 1 44 0z" fill="#fffaf0"/><circle cx="96" cy="74" r="9" fill="#e8553a"/><ellipse cx="42" cy="76" rx="9" ry="6" fill="#f0dfb8"/><circle cx="42" cy="76" r="3" fill="#f0dfb8"/><path d="M60 44q4-10 0-18M78 44q4-10 0-18" fill="none" stroke="#fffaf0" stroke-width="3" stroke-linecap="round"/>',
+'点心':'<rect x="24" y="78" width="92" height="26" fill="#f0dfb8"/><rect x="24" y="88" width="92" height="5" fill="#7fb3b5"/><rect x="32" y="52" width="76" height="26" fill="#f0dfb8"/><rect x="32" y="62" width="76" height="5" fill="#7fb3b5"/><path d="M38 52a32 20 0 0 1 64 0z" fill="#e8553a"/><circle cx="70" cy="28" r="5" fill="#fffaf0"/>',
+'大炒':'<path d="M22 60h86a43 34 0 0 1-86 0z" fill="#7fb3b5"/><rect x="104" y="58" width="30" height="7" fill="#7fb3b5"/><path d="M40 58q6-22 18-8q4-22 16-6q10-18 16 14z" fill="#f0dfb8"/><path d="M52 58q4-10 10-4q4-10 10 4z" fill="#f0dfb8"/><circle cx="46" cy="28" r="5" fill="#fffaf0"/><circle cx="84" cy="22" r="4" fill="#e8553a"/><rect x="50" y="98" width="30" height="7" fill="#e8553a"/>',
+'粥煲':'<rect x="30" y="56" width="80" height="44" fill="#f0dfb8"/><rect x="24" y="48" width="92" height="10" fill="#7fb3b5"/><rect x="62" y="38" width="16" height="10" fill="#e8553a"/><rect x="12" y="62" width="18" height="8" fill="#7fb3b5"/><rect x="110" y="62" width="18" height="8" fill="#7fb3b5"/><path d="M30 78h80" stroke="#f0dfb8" stroke-width="5"/><path d="M52 32q4-10 0-18M88 32q4-10 0-18" fill="none" stroke="#fffaf0" stroke-width="3" stroke-linecap="round"/>',
+'咖啡':'<rect x="36" y="48" width="56" height="50" fill="#fffaf0"/><rect x="36" y="48" width="56" height="12" fill="#e8553a"/><path d="M92 58h10a12 12 0 0 1 0 24h-10" fill="none" stroke="#fffaf0" stroke-width="7"/><rect x="26" y="100" width="76" height="7" fill="#7fb3b5"/><path d="M54 38q4-10 0-18M72 38q4-10 0-18" fill="none" stroke="#f0dfb8" stroke-width="3" stroke-linecap="round"/>'
+};
+const icon = c => '<svg viewBox="0 0 140 120" aria-hidden="true">'+I[c]+'</svg>';
+const CATS = {
+  '中餐':{i:'点心',col:'#e4432b',re:/chinese|noodle|dim_sum|dumpling|hotpot|hot_pot|cantonese|hainan|teochew|hakka|porridge|bak_kut_teh|taiwan/},
+  '马来':{i:'饭',col:'#1f8a70',re:/malay|indonesian|nasi|satay|padang|nyonya|peranakan|local|asian|seafood/},
+  '印度·嘛嘛':{i:'粥煲',col:'#f4972a',re:/indian|mamak|curry|pakistani|arab|middle_eastern|kebab/},
+  '日韩泰':{i:'面',col:'#2b8fbe',re:/japanese|sushi|ramen|korean|thai|vietnamese|pho/},
+  '西餐·快餐':{i:'大炒',col:'#12324a',re:/burger|pizza|western|italian|steak|american|chicken|sandwich|fried|pasta|mexican/},
+  '咖啡·茶点':{i:'咖啡',col:'#ffc93c',re:/coffee|cafe|bubble_tea|tea|dessert|cake|ice_cream|bakery|juice/},
+  '其他':{i:'饭',col:'#8a8f7a',re:/$^/}
+};
+function catOf(t){
+  const c = (t.cuisine || '').toLowerCase();
+  for (const k of ['日韩泰','印度·嘛嘛','西餐·快餐','中餐','咖啡·茶点','马来']) if (CATS[k].re.test(c)) return k;
+  if (t.amenity === 'cafe') return '咖啡·茶点';
+  if (/[一-鿿]/.test(t.name || '') || /kopitiam|kedai kopi|kedai makanan/i.test(t.name || '')) return '中餐';
+  if (/mamak|nasi kandar|maju|bistro/i.test(t.name || '')) return '印度·嘛嘛';
+  if (/warung|nasi|ayam|ikan|selera|masakan/i.test(t.name || '')) return '马来';
+  return '其他';
+}
+let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const store = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+const state = { req:0, lid:0, pos:null, radius:1000, cat:'', places:[], skip:new Set(), seen:[], cur:null, busy:false };
+const today = new Date().toDateString();
+const sk = store.get('near-skip'); if (sk && sk.day === today) sk.ids.forEach(i => state.skip.add(i));
+const saveSkip = () => store.set('near-skip', {day:today, ids:[...state.skip]});
+
+function dist(a, b){
+  const R = 6371000, r = Math.PI/180, dLa = (b.lat-a.lat)*r, dLo = (b.lon-a.lon)*r;
+  const h = Math.sin(dLa/2)**2 + Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+const fmtD = m => m < 950 ? Math.round(m/10)*10 + ' 米' : (m/1000).toFixed(1) + ' 公里';
+
+const F = { radius:[[500,'500 米'],[1000,'1 公里'],[2000,'2 公里'],[5000,'5 公里']], cat:[['','随便']].concat(Object.keys(CATS).map(k => [k,k])) };
+function chips(key){
+  $('f-'+key).innerHTML = F[key].map(([v,l]) => `<button type="button" class="chip" data-k="${key}" data-v="${v}" aria-pressed="${String(state[key])===String(v)}">${l}</button>`).join('');
+}
+document.querySelector('.filters').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  if (b.dataset.k === 'radius') { state.radius = Number(b.dataset.v); chips('radius'); if (state.pos) load(); }
+  else { state.cat = b.dataset.v; chips('cat'); state.seen = []; draw(true); }
+});
+
+function openManual(){ $('manual').closest('details').open = true; }
+function setWhere(a, b){ $('where').textContent = a; $('where2').textContent = b || ''; }
+
+function locate(auto){
+  if (!navigator.geolocation) { setWhere('这个浏览器不支持定位', '在下面输入地名也可以'); openManual(); return; }
+  if (!auto) setWhere('正在定位…', '如果浏览器弹出询问，请点允许');
+  const lid = ++state.lid; let done = false;
+  if (!auto) setTimeout(() => { if (!done && lid === state.lid) { done = true; setWhere('定位没有回应', framed ? '预览窗口不允许定位，请下载文件后用 Chrome 或 Safari 打开' : '浏览器没有给出位置。展开「手动输入地点」填地名也可以'); openManual(); } }, 15000);
+  navigator.geolocation.getCurrentPosition(p => {
+    if (done || lid !== state.lid) return; done = true;
+    const np = {lat:p.coords.latitude, lon:p.coords.longitude, acc:p.coords.accuracy};
+    if (auto && state.pos && dist(state.pos, np) < 250) return;      // 没走远，不打扰
+    const moved = auto && state.pos;
+    state.pos = np; state.label = null; load(moved ? '你换地方了，已按新位置更新。' : '');
+  }, err => {
+    if (auto || done || lid !== state.lid) return; done = true; openManual();
+    setWhere(err.code === 1 ? '没有拿到定位权限' : '定位失败', framed ? '预览窗口不允许定位，请下载文件后用 Chrome 或 Safari 打开' : err.code === 1 ? '在浏览器的网站设置里允许位置，或在下面输入地名' : '检查一下设备的定位服务是否打开，或在下面输入地名');
+  }, {enableHighAccuracy:true, timeout:12000, maximumAge:auto ? 60000 : 0});
+}
+
+function tfetch(url, opt, ms){
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 15000);
+  return fetch(url, Object.assign({signal:c.signal}, opt || {})).finally(() => clearTimeout(t));
+}
+async function overpass(q){
+  const hosts = ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+  let last;
+  for (const h of hosts) {
+    try { const r = await tfetch(h, {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}}, 20000); if (r.ok) return await r.json(); last = new Error('HTTP ' + r.status); }
+    catch (e) { last = e; }
+  }
+  throw last;
+}
+async function load(note){
+  const my = ++state.req; state.busy = true;
+  const {lat, lon} = state.pos;
+  setWhere('正在找附近的店…', '');
+  nameArea();
+  const q = `[out:json][timeout:20];(nwr["amenity"~"^(restaurant|cafe|fast_food|food_court)$"]["name"](around:${state.radius},${lat},${lon}););out tags center 300;`;
+  try {
+    const j = await overpass(q);
+    if (my !== state.req) return;
+    state.places = j.elements.map(e => {
+      const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, t = e.tags || {};
+      if (la == null) return null;
+      return { id:e.type[0]+e.id, n:t['name:zh'] && t['name:zh'] !== t.name ? `${t.name}（${t['name:zh']}）` : t.name, lat:la, lon:lo, c:catOf(t),
+        cu:(t.cuisine || '').replace(/_/g,' ').split(';').slice(0,3).join('、'), h:t.opening_hours || '', halal:t['diet:halal'], d:dist(state.pos, {lat:la, lon:lo}),
+        kind:{restaurant:'餐厅',cafe:'咖啡店',fast_food:'快餐',food_court:'美食中心'}[t.amenity] };
+    }).filter(Boolean).sort((a,b) => a.d - b.d);
+    store.set('near-cache', {pos:state.pos, radius:state.radius, places:state.places, label:state.label, at:Date.now()});
+    state.seen = []; state.note = note || ''; draw(true);
+  } catch (e) {
+    if (my !== state.req) return;
+    state.busy = false; state.places = []; draw(true);
+    setWhere('查不到附近的店', framed ? '预览窗口挡住了联网，请下载文件后用 Chrome 或 Safari 打开' : '地图服务暂时连不上（' + (e && e.name === 'AbortError' ? '超时' : '网络错误') + '），点「重新定位」再试');
+    return;
+  }
+  state.busy = false; whereLine();
+}
+async function nameArea(){
+  if (state.label) return whereLine();
+  try {
+    const r = await tfetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=zh,en&lat=${state.pos.lat}&lon=${state.pos.lon}`);
+    const a = (await r.json()).address || {};
+    state.label = [a.neighbourhood || a.suburb || a.village || a.quarter || a.road, a.city || a.town || a.county].filter(Boolean).join(' · ');
+  } catch (e) { state.label = ''; }
+  whereLine();
+}
+function whereLine(){
+  if (!state.pos || state.busy) return;
+  const acc = state.pos.acc ? `，定位误差约 ${Math.round(state.pos.acc)} 米` : '';
+  setWhere(state.label || `${state.pos.lat.toFixed(4)}, ${state.pos.lon.toFixed(4)}`, `${fmtD(state.radius)}内找到 ${state.places.length} 家${acc}`);
+}
+
+const pool = () => state.places.filter(p => (!state.cat || p.c === state.cat) && !state.skip.has(p.id));
+function show(p){
+  state.cur = p; const C = CATS[p.c];
+  $('tile').innerHTML = icon(C.i);
+  $('r-name').textContent = p.n;
+  $('r-dish').textContent = [p.kind, p.cu].filter(Boolean).join(' · ');
+  $('r-meta').innerHTML = `<span class="tag">${fmtD(p.d)}</span><span class="tag line">走路约 ${Math.max(1, Math.round(p.d/75))} 分钟</span><span class="tag line">${esc(p.c)}</span>` +
+    (p.halal === 'yes' || p.halal === 'only' ? '<span class="tag ok">清真</span>' : p.halal === 'no' ? '<span class="tag warn">非清真</span>' : '');
+  $('r-hours').textContent = p.h ? '营业：' + p.h : '地图资料里没有营业时间';
+  $('nav').href = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
+  document.querySelectorAll('#list li').forEach(li => li.style.background = li.dataset.id === p.id ? 'var(--sand)' : '');
+}
+function empty(){
+  state.cur = null; $('tile').innerHTML = icon('饭');
+  $('r-name').textContent = state.places.length ? '这个类型附近没有' : (state.pos ? '附近没找到店' : '等你的定位');
+  $('r-dish').textContent = state.pos ? '把范围调大，或换个类型再抽。' : '允许定位后，这里会抽出一家附近的店。';
+  $('r-meta').innerHTML = ''; $('r-hours').textContent = ''; $('nav').removeAttribute('href');
+}
+let timer = null;
+function draw(instant){
+  clearInterval(timer); $('result').classList.remove('spinning');
+  const c = pool(); list();
+  if (!c.length) { empty(); return; }
+  let fresh = c.filter(p => !state.seen.includes(p.id));
+  if (!fresh.length) { state.seen = state.cur && c.length > 1 ? [state.cur.id] : []; fresh = c.filter(p => !state.seen.includes(p.id)); }
+  const win = fresh[Math.floor(Math.random()*fresh.length)]; state.seen.push(win.id);
+  if (instant || matchMedia('(prefers-reduced-motion: reduce)').matches || c.length < 2) { show(win); return; }
+  const box = $('result'); box.classList.add('spinning'); let i = 0;
+  timer = setInterval(() => { $('r-name').textContent = c[Math.floor(Math.random()*c.length)].n; if (++i > 12) { clearInterval(timer); box.classList.remove('spinning'); show(win); } }, 70);
+}
+function list(){
+  const c = pool();
+  $('count').textContent = state.places.length ? `${c.length} 家` : '';
+  $('list').innerHTML = state.places.slice(0, 120).map(p => {
+    const on = (!state.cat || p.c === state.cat) && !state.skip.has(p.id);
+    return `<li class="${on ? '' : 'off'}" data-id="${p.id}"><span class="bar" style="background:${CATS[p.c].col}"></span>
+      <button type="button" class="pickme" style="all:unset;cursor:pointer;display:block"><strong>${esc(p.n)}</strong><small>${esc(p.c)}${p.cu ? '　·　' + esc(p.cu) : ''}${state.skip.has(p.id) ? '　·　今天已排除' : ''}</small></button>
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" rel="noopener">${fmtD(p.d)}</a></li>`;
+  }).join('');
+  const n = state.skip.size;
+  $('status').innerHTML = (state.note ? esc(state.note) + ' ' : '') + (n ? `今天排除了 ${n} 家。<button type="button" id="reset" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:700">全部恢复</button>` : (state.note ? '' : ''));
+  state.note = '';
+}
+
+$('go').addEventListener('click', () => draw(false));
+$('nope').addEventListener('click', () => { if (state.cur) { state.skip.add(state.cur.id); saveSkip(); } draw(false); });
+$('relocate').addEventListener('click', () => locate(false));
+$('status').addEventListener('click', e => { if (e.target.id === 'reset') { state.skip.clear(); saveSkip(); draw(true); } });
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('.pickme'); if (!b) return;
+  const p = state.places.find(x => x.id === b.closest('li').dataset.id);
+  clearInterval(timer); $('result').classList.remove('spinning');
+  if (state.skip.delete(p.id)) saveSkip();
+  list(); show(p); $('result').scrollIntoView({block:'center', behavior:'smooth'});
+});
+async function manual(){
+  const q = $('place').value.trim(); if (!q) { $('place').focus(); return; }
+  state.lid++; setWhere('正在找这个地方…', q);
+  try {
+    const r = await tfetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=zh,en&q=' + encodeURIComponent(q));
+    const j = await r.json();
+    if (!j.length) { setWhere('找不到这个地名', '换个写法，或加上城市名再试'); return; }
+    state.pos = {lat:+j[0].lat, lon:+j[0].lon}; state.label = q; load();
+  } catch (err) { setWhere('地名查询失败', framed ? '预览窗口挡住了联网，请下载文件后用 Chrome 或 Safari 打开' : '连不上地名服务，检查网络后再试'); }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+$('manual-go').addEventListener('click', manual);
+$('place').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); manual(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && navigator.geolocation) locate(true); });
+
+chips('radius'); chips('cat');
+const cache = store.get('near-cache');
+if (cache && Date.now() - cache.at < 6*3600*1000) { Object.assign(state, {pos:cache.pos, radius:cache.radius, places:cache.places, label:cache.label}); chips('radius'); draw(true); whereLine(); locate(true); }
+else { empty(); list(); locate(false); }
+</script>
+</body>
+</html>
